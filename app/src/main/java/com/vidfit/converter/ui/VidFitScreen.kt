@@ -62,8 +62,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vidfit.converter.data.CookieSite
@@ -302,13 +305,28 @@ private fun BentoTopBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "Vidow",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = colors.primaryText
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                val isDarkSurface = colors.pageBackground.red < 0.2f
+                val owColor = if (isDarkSurface) Color(0xFF7DD3FC) else Color(0xFF0284C7)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = colors.subtleSurface,
+                    border = BorderStroke(1.dp, colors.cardBorder)
+                ) {
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(color = colors.primaryText, fontWeight = FontWeight.ExtraBold)) {
+                                append("Vid")
+                            }
+                            withStyle(SpanStyle(color = owColor, fontWeight = FontWeight.ExtraBold)) {
+                                append("ow")
+                            }
+                        },
+                        fontSize = 20.sp,
+                        letterSpacing = (-0.5).sp,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
                 Text(
                     text = if (activeTab == AppTab.DOWNLOAD) "网络视频下载 · yt-dlp 核心" else "全平台兼容 · 上传体积精准控制",
                     style = MaterialTheme.typography.bodySmall,
