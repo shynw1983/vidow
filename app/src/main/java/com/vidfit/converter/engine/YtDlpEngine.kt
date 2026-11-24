@@ -5,18 +5,25 @@ import com.vidfit.converter.R
 import com.vidfit.converter.model.DownloadFormatMode
 import com.vidfit.converter.model.ParsedLinkInfo
 import com.vidfit.converter.model.ParsedQualityOption
+import com.vidfit.converter.model.SubtitlePreset
+import com.vidfit.converter.model.SubtitleTrackOption
 import com.vidfit.converter.model.YtDlpUpdateState
 import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
-import com.yausername.youtubedl_android.mapper.VideoFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+
+data class SubtitleDownloadArgs(
+    val subLangs: String,
+    val writeAutoSubs: Boolean
+)
 
 class YtDlpEngine(private val appContext: Context) {
 
@@ -86,20 +93,47 @@ class YtDlpEngine(private val appContext: Context) {
             val request = YoutubeDLRequest(url).apply {
                 addOption("--no-playlist")
                 addOption("--no-warnings")
+                addOption("--dump-json")
                 if (cookiesFile != null && cookiesFile.exists()) {
                     addOption("--cookies", cookiesFile.absolutePath)
                 }
             }
-            val info = YoutubeDL.getInstance().getInfo(request)
-            val durationSec = info.duration.toLong().coerceAtLeast(0L)
+            val response = YoutubeDL.getInstance().execute(request)
+            val rawOut = response.out.orEmpty().trim()
+            val jsonLine = rawOut.lineSequence().firstOrNull { it.trimStart().startsWith("{") } ?: rawOut
+            val json = JSONObject(jsonLine)
 
-            val rawThumbnail = info.thumbnail?.takeIf { it.isNotBlank() }
-                ?: info.thumbnails?.lastOrNull { !it.url.isNullOrBlank() }?.url
+            val durationSec = json.optDouble("duration", 0.0)
+                .let { if (it.isNaN() || it.isInfinite()) 0L else it.toLong() }
+                .coerceAtLeast(0L)
+
+            val rawThumbnail = json.optNullableString("thumbnail")
+                ?: run {
+                    val thumbs = json.optJSONArray("thumbnails")
+                    var picked: String? = null
+                    if (thumbs != null) {
+                        for (i in thumbs.length() - 1 downTo 0) {
+                            val tUrl = thumbs.optJSONObject(i)?.optNullableString("url")
+                            if (!tUrl.isNullOrBlank()) {
+                                picked = tUrl
+                                break
+                            }
+                        }
+                    }
+                    picked
+                }
             val safeThumbnail = rawThumbnail?.let {
                 if (it.startsWith("http://")) "https://" + it.removePrefix("http://") else it
             }
 
-            val allFormats = info.formats.orEmpty()
+            val allFormats = buildList {
+                val arr = json.optJSONArray("formats")
+                if (arr != null) {
+                    for (i in 0 until arr.length()) {
+                        arr.optJSONObject(i)?.let { add(RawFormat.fromJson(it)) }
+                    }
+                }
+            }
 
             val audioOnlyFormats = allFormats.filter { fmt ->
                 (fmt.vcodec == null || fmt.vcodec.equals("none", ignoreCase = true)) &&
@@ -108,9 +142,9 @@ class YtDlpEngine(private val appContext: Context) {
             }
             val bestM4aAudio = audioOnlyFormats
                 .filter { it.ext.equals("m4a", ignoreCase = true) || it.acodec?.contains("mp4a", true) == true }
-                .maxByOrNull { numberToInt(it.abr).takeIf { a -> a > 0 } ?: numberToInt(it.tbr) }
+                .maxByOrNull { it.abr.takeIf { a -> a > 0 } ?: it.tbr }
             val bestAnyAudio = audioOnlyFormats
-                .maxByOrNull { numberToInt(it.abr).takeIf { a -> a > 0 } ?: numberToInt(it.tbr) }
+                .maxByOrNull { it.abr.takeIf { a -> a > 0 } ?: it.tbr }
 
             val audioForCompat = bestM4aAudio ?: bestAnyAudio
             val audioForBest = bestAnyAudio ?: bestM4aAudio
@@ -118,7 +152,7 @@ class YtDlpEngine(private val appContext: Context) {
             val bestAudioCodec = normalizeAudioCodec(audioForBest?.acodec) ?: "AAC"
             val bestAudioExt = (audioForBest?.ext ?: "m4a").uppercase(Locale.US)
             val bestAudioAbr = audioForBest?.let {
-                numberToInt(it.abr).takeIf { a -> a > 0 } ?: numberToInt(it.tbr)
+                it.abr.takeIf { a -> a > 0 } ?: it.tbr
             } ?: 0
             val bestAudioSize = audioForBest?.let { estimateFormatSize(it, durationSec) }
 
@@ -126,9 +160,11 @@ class YtDlpEngine(private val appContext: Context) {
                 fmt.height > 0 && (fmt.vcodec == null || !fmt.vcodec.equals("none", ignoreCase = true))
             }
 
+            val fallbackExt = json.optNullableString("ext") ?: "mp4"
+
             fun toQualityOption(
-                fmt: VideoFormat,
-                pairedAudio: VideoFormat?,
+                fmt: RawFormat,
+                pairedAudio: RawFormat?,
                 forceMp4MergeLabel: Boolean
             ): ParsedQualityOption {
                 val w = fmt.width.coerceAtLeast(0)
@@ -140,10 +176,10 @@ class YtDlpEngine(private val appContext: Context) {
                 } else {
                     normalizeAudioCodec(pairedAudio?.acodec) ?: bestAudioCodec
                 }
-                val rawExt = (fmt.ext ?: info.ext ?: "mp4").uppercase(Locale.US)
+                val rawExt = (fmt.ext ?: fallbackExt).uppercase(Locale.US)
                 val displayExt = if (forceMp4MergeLabel) "MP4" else rawExt
-                val fps = numberToInt(fmt.fps)
-                val vBitrate = numberToInt(fmt.tbr)
+                val fps = fmt.fps
+                val vBitrate = fmt.tbr
                 val videoBytes = estimateFormatSize(fmt, durationSec)
                 val audioBytes = if (!hasEmbeddedAudio) pairedAudio?.let { estimateFormatSize(it, durationSec) } else null
                 val totalBytes = when {
@@ -172,10 +208,10 @@ class YtDlpEngine(private val appContext: Context) {
 
             val compatQualities = groupedByHeight.map { (_, list) ->
                 val chosen = list.maxWithOrNull(
-                    compareBy<VideoFormat>(
+                    compareBy<RawFormat>(
                         { if (normalizeVideoCodec(it.vcodec) == "H.264") 2 else if (it.ext.equals("mp4", true)) 1 else 0 },
                         { if (!it.acodec.isNullOrBlank() && !it.acodec.equals("none", true)) 1 else 0 },
-                        { numberToInt(it.tbr) },
+                        { it.tbr },
                         { maxOf(it.fileSize, it.fileSizeApproximate) }
                     )
                 ) ?: list.first()
@@ -184,23 +220,28 @@ class YtDlpEngine(private val appContext: Context) {
 
             val bestQualities = groupedByHeight.map { (_, list) ->
                 val chosen = list.maxWithOrNull(
-                    compareBy<VideoFormat>(
-                        { numberToInt(it.tbr) },
+                    compareBy<RawFormat>(
+                        { it.tbr },
                         { maxOf(it.fileSize, it.fileSizeApproximate) },
-                        { numberToInt(it.fps) }
+                        { it.fps }
                     )
                 ) ?: list.first()
                 toQualityOption(chosen, audioForBest, forceMp4MergeLabel = false)
             }.sortedByDescending { it.ytDlpHeight }
 
+            val (officialSubs, autoSubs) = parseSubtitleTracks(json, Locale.getDefault())
+
+            val extractorKey = json.optNullableString("extractor_key")
+            val extractor = json.optNullableString("extractor")
+
             ParsedLinkInfo(
                 url = url,
-                title = info.title?.takeIf { it.isNotBlank() } ?: appContext.getString(R.string.dl_unnamed_video),
-                uploader = info.uploader?.takeIf { it.isNotBlank() } ?: (info.extractor ?: "Web"),
+                title = json.optNullableString("title") ?: appContext.getString(R.string.dl_unnamed_video),
+                uploader = json.optNullableString("uploader") ?: extractor ?: "Web",
                 durationSeconds = durationSec,
-                extractor = info.extractorKey ?: info.extractor ?: "Web",
+                extractor = extractorKey ?: extractor ?: "Web",
                 thumbnailUrl = safeThumbnail,
-                defaultExt = (info.ext ?: "mp4").uppercase(Locale.US),
+                defaultExt = fallbackExt.uppercase(Locale.US),
                 defaultVideoCodec = compatQualities.firstOrNull()?.videoCodec
                     ?: bestQualities.firstOrNull()?.videoCodec,
                 bestAudioCodec = bestAudioCodec,
@@ -208,7 +249,9 @@ class YtDlpEngine(private val appContext: Context) {
                 bestAudioBitrateKbps = bestAudioAbr,
                 bestAudioSizeBytes = bestAudioSize,
                 compatQualities = compatQualities,
-                bestQualities = bestQualities
+                bestQualities = bestQualities,
+                officialSubtitles = officialSubs,
+                autoSubtitles = autoSubs
             )
         }
     }
@@ -218,6 +261,11 @@ class YtDlpEngine(private val appContext: Context) {
         mode: DownloadFormatMode,
         selectedMaxHeight: Int?,
         embedSubtitles: Boolean,
+        subtitlePreset: SubtitlePreset = SubtitlePreset.MULTI_4,
+        selectedSubtitleLangs: Set<String> = emptySet(),
+        includeAutoSubtitles: Boolean = false,
+        hasOfficialSubtitles: Boolean = true,
+        selectedIncludesAutoTrack: Boolean = false,
         cookiesFile: File? = null,
         onProgress: (percent: Int, etaSeconds: Long, line: String) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
@@ -265,8 +313,19 @@ class YtDlpEngine(private val appContext: Context) {
                 }
 
                 if (embedSubtitles && mode != DownloadFormatMode.AUDIO_M4A) {
+                    val subArgs = resolveSubtitleDownloadArgs(
+                        preset = subtitlePreset,
+                        selectedLangs = selectedSubtitleLangs,
+                        systemLanguage = Locale.getDefault().language,
+                        includeAutoSubtitles = includeAutoSubtitles,
+                        hasOfficialSubtitles = hasOfficialSubtitles,
+                        selectedIncludesAutoTrack = selectedIncludesAutoTrack
+                    )
                     addOption("--write-subs")
-                    addOption("--sub-langs", "zh.*,en.*")
+                    if (subArgs.writeAutoSubs) {
+                        addOption("--write-auto-subs")
+                    }
+                    addOption("--sub-langs", subArgs.subLangs)
                     addOption("--embed-subs")
                 }
             }
@@ -298,20 +357,183 @@ class YtDlpEngine(private val appContext: Context) {
         return runCatching { YoutubeDL.getInstance().destroyProcessById(pid) }.getOrDefault(false)
     }
 
-    private fun estimateFormatSize(fmt: VideoFormat, durationSec: Long): Long? {
+    private data class RawFormat(
+        val vcodec: String?,
+        val acodec: String?,
+        val ext: String?,
+        val width: Int,
+        val height: Int,
+        val fps: Int,
+        val tbr: Int,
+        val abr: Int,
+        val fileSize: Long,
+        val fileSizeApproximate: Long
+    ) {
+        companion object {
+            fun fromJson(obj: JSONObject): RawFormat {
+                fun optIntSafe(key: String): Int {
+                    val v = obj.optDouble(key, 0.0)
+                    return if (v.isNaN() || v.isInfinite()) 0 else v.toInt().coerceAtLeast(0)
+                }
+                return RawFormat(
+                    vcodec = obj.optNullableString("vcodec"),
+                    acodec = obj.optNullableString("acodec"),
+                    ext = obj.optNullableString("ext"),
+                    width = optIntSafe("width"),
+                    height = optIntSafe("height"),
+                    fps = optIntSafe("fps"),
+                    tbr = optIntSafe("tbr"),
+                    abr = optIntSafe("abr"),
+                    fileSize = obj.optLong("filesize", 0L).coerceAtLeast(0L),
+                    fileSizeApproximate = obj.optLong("filesize_approx", 0L).coerceAtLeast(0L)
+                )
+            }
+        }
+    }
+
+    private fun estimateFormatSize(fmt: RawFormat, durationSec: Long): Long? {
         val exact = maxOf(fmt.fileSize, fmt.fileSizeApproximate)
         if (exact > 0L) return exact
-        val kbps = numberToInt(fmt.tbr).takeIf { it > 0 } ?: numberToInt(fmt.abr)
+        val kbps = fmt.tbr.takeIf { it > 0 } ?: fmt.abr
         if (kbps > 0 && durationSec > 0L) {
             return (kbps.toLong() * 1000L * durationSec) / 8L
         }
         return null
     }
 
-    private fun numberToInt(value: Any?): Int = (value as? Number)?.toInt() ?: 0
-
     companion object {
         private val URL_REGEX = Regex("""https?://[^\s\u4e00-\u9fa5"'<>]+""", RegexOption.IGNORE_CASE)
+        private val IGNORED_SUBTITLE_KEYS = setOf("live_chat", "danmaku")
+        private val PRIORITY_SUB_LANGS = listOf("zh", "en", "ja", "ko")
+
+        private fun JSONObject.optNullableString(key: String): String? {
+            if (isNull(key)) return null
+            return optString(key, "").takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+        }
+
+        fun resolveSubtitleDownloadArgs(
+            preset: SubtitlePreset,
+            selectedLangs: Set<String>,
+            systemLanguage: String,
+            includeAutoSubtitles: Boolean,
+            hasOfficialSubtitles: Boolean = true,
+            selectedIncludesAutoTrack: Boolean = false
+        ): SubtitleDownloadArgs {
+            val sysBase = systemLanguage.trim().lowercase(Locale.US)
+                .substringBefore('-')
+                .substringBefore('_')
+                .ifBlank { "en" }
+            return when (preset) {
+                SubtitlePreset.MULTI_4 -> SubtitleDownloadArgs(
+                    subLangs = "zh.*,en.*,ja.*,ko.*",
+                    writeAutoSubs = includeAutoSubtitles
+                )
+                SubtitlePreset.SYSTEM_LANG -> SubtitleDownloadArgs(
+                    subLangs = "$sysBase.*",
+                    writeAutoSubs = includeAutoSubtitles
+                )
+                SubtitlePreset.ALL_OFFICIAL -> {
+                    // Never pair `all` with --write-auto-subs (YouTube has 100+ auto-translated tracks
+                    // that quickly trigger HTTP 429 rate-limits).
+                    if (includeAutoSubtitles && !hasOfficialSubtitles) {
+                        SubtitleDownloadArgs(
+                            subLangs = "zh.*,en.*,ja.*,ko.*",
+                            writeAutoSubs = true
+                        )
+                    } else {
+                        SubtitleDownloadArgs(
+                            subLangs = "all,-live_chat,-danmaku",
+                            writeAutoSubs = false
+                        )
+                    }
+                }
+                SubtitlePreset.CUSTOM -> {
+                    val cleaned = selectedLangs.map { it.trim() }.filter { it.isNotBlank() }
+                    if (cleaned.isEmpty()) {
+                        SubtitleDownloadArgs(
+                            subLangs = "zh.*,en.*,ja.*,ko.*",
+                            writeAutoSubs = includeAutoSubtitles
+                        )
+                    } else {
+                        SubtitleDownloadArgs(
+                            subLangs = cleaned.joinToString(","),
+                            writeAutoSubs = includeAutoSubtitles || selectedIncludesAutoTrack
+                        )
+                    }
+                }
+            }
+        }
+
+        fun parseSubtitleTracks(
+            json: JSONObject,
+            displayLocale: Locale = Locale.getDefault()
+        ): Pair<List<SubtitleTrackOption>, List<SubtitleTrackOption>> {
+            val officialMap = extractSubtitleMap(json.optJSONObject("subtitles"), isAuto = false, displayLocale = displayLocale)
+            val autoMap = extractSubtitleMap(json.optJSONObject("automatic_captions"), isAuto = true, displayLocale = displayLocale)
+                .filterKeys { it !in officialMap.keys }
+
+            val sysLang = displayLocale.language.lowercase(Locale.US)
+            val comparator = compareBy<SubtitleTrackOption>(
+                { trackSortRank(it.langCode, sysLang) },
+                { it.langCode.lowercase(Locale.US) }
+            )
+            return officialMap.values.sortedWith(comparator) to autoMap.values.sortedWith(comparator)
+        }
+
+        private fun extractSubtitleMap(
+            obj: JSONObject?,
+            isAuto: Boolean,
+            displayLocale: Locale
+        ): Map<String, SubtitleTrackOption> {
+            if (obj == null) return emptyMap()
+            val out = LinkedHashMap<String, SubtitleTrackOption>()
+            val keys = obj.keys()
+            while (keys.hasNext()) {
+                val rawKey = keys.next() ?: continue
+                val keyLower = rawKey.lowercase(Locale.US)
+                if (keyLower in IGNORED_SUBTITLE_KEYS) continue
+                val tracks = obj.optJSONArray(rawKey) ?: continue
+                if (tracks.length() == 0) continue
+
+                var remoteName: String? = null
+                for (i in 0 until tracks.length()) {
+                    val name = tracks.optJSONObject(i)?.optNullableString("name")
+                    if (!name.isNullOrBlank()) {
+                        remoteName = name
+                        break
+                    }
+                }
+                val label = remoteName ?: formatLanguageCodeLabel(rawKey, displayLocale)
+                out[rawKey] = SubtitleTrackOption(
+                    langCode = rawKey,
+                    displayName = label,
+                    isAutoGenerated = isAuto
+                )
+            }
+            return out
+        }
+
+        private fun trackSortRank(langCode: String, systemLang: String): Int {
+            val lower = langCode.lowercase(Locale.US)
+            val base = lower.substringBefore('-').substringBefore('_')
+            return when {
+                lower.endsWith("-orig") -> 0
+                systemLang.isNotBlank() && base == systemLang -> 1
+                base in PRIORITY_SUB_LANGS -> 2 + PRIORITY_SUB_LANGS.indexOf(base)
+                else -> 10
+            }
+        }
+
+        fun formatLanguageCodeLabel(langCode: String, displayLocale: Locale = Locale.getDefault()): String {
+            val clean = langCode.removeSuffix("-orig").replace('_', '-')
+            val parsed = Locale.forLanguageTag(clean)
+            val localized = parsed.getDisplayName(displayLocale)
+            return if (!localized.isNullOrBlank() && !localized.equals(clean, ignoreCase = true)) {
+                localized
+            } else {
+                langCode
+            }
+        }
 
         fun extractFirstUrl(rawText: String?): String? {
             if (rawText.isNullOrBlank()) return null

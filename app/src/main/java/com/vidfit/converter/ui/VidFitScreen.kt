@@ -87,6 +87,7 @@ import com.vidfit.converter.model.FrameRateCap
 import com.vidfit.converter.model.OutputVideoCodec
 import com.vidfit.converter.model.QualityTier
 import com.vidfit.converter.model.ResolutionCap
+import com.vidfit.converter.model.SubtitlePreset
 import com.vidfit.converter.model.VideoInfo
 import com.vidfit.converter.ui.components.BentoDownloadTab
 import com.vidfit.converter.ui.components.BentoSettingsBottomSheet
@@ -110,6 +111,9 @@ fun VidFitScreen(
     onDownloadFormatModeChange: (DownloadFormatMode) -> Unit,
     onSelectedMaxHeightChange: (Int?) -> Unit,
     onEmbedSubtitlesChange: (Boolean) -> Unit,
+    onSubtitlePresetChange: (SubtitlePreset) -> Unit,
+    onIncludeAutoSubtitlesChange: (Boolean) -> Unit,
+    onToggleSubtitleLang: (String) -> Unit,
     onAutoConvertChange: (Boolean) -> Unit,
     onStartDownload: () -> Unit,
     onCancelDownload: () -> Unit,
@@ -221,6 +225,9 @@ fun VidFitScreen(
                         onFormatModeChange = onDownloadFormatModeChange,
                         onSelectedMaxHeightChange = onSelectedMaxHeightChange,
                         onEmbedSubtitlesChange = onEmbedSubtitlesChange,
+                        onSubtitlePresetChange = onSubtitlePresetChange,
+                        onIncludeAutoSubtitlesChange = onIncludeAutoSubtitlesChange,
+                        onToggleSubtitleLang = onToggleSubtitleLang,
                         onAutoConvertChange = onAutoConvertChange,
                         onStartDownload = onStartDownload,
                         onCancelDownload = onCancelDownload,

@@ -5,6 +5,7 @@ import android.net.Uri
 import com.vidfit.converter.model.ConversionResult
 import com.vidfit.converter.model.DownloadFormatMode
 import com.vidfit.converter.model.DownloadResult
+import com.vidfit.converter.model.SubtitlePreset
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -12,6 +13,8 @@ import java.io.File
 data class SavedDownloadPrefs(
     val formatMode: DownloadFormatMode = DownloadFormatMode.VIDEO_MP4,
     val embedSubtitles: Boolean = false,
+    val subtitlePreset: SubtitlePreset = SubtitlePreset.MULTI_4,
+    val includeAutoSubtitles: Boolean = false,
     val autoConvertAfterDownload: Boolean = false,
     val useNightlyChannel: Boolean = false
 )
@@ -59,9 +62,14 @@ class HistoryStore(private val context: Context) {
         val modeName = obj.optString("formatMode", DownloadFormatMode.VIDEO_MP4.name)
         val mode = DownloadFormatMode.entries.firstOrNull { it.name == modeName }
             ?: DownloadFormatMode.VIDEO_MP4
+        val presetName = obj.optString("subtitlePreset", SubtitlePreset.MULTI_4.name)
+        val preset = SubtitlePreset.entries.firstOrNull { it.name == presetName }
+            ?: SubtitlePreset.MULTI_4
         SavedDownloadPrefs(
             formatMode = mode,
             embedSubtitles = obj.optBoolean("embedSubtitles", false),
+            subtitlePreset = if (preset == SubtitlePreset.CUSTOM) SubtitlePreset.MULTI_4 else preset,
+            includeAutoSubtitles = obj.optBoolean("includeAutoSubtitles", false),
             autoConvertAfterDownload = obj.optBoolean("autoConvertAfterDownload", false),
             useNightlyChannel = obj.optBoolean("useNightlyChannel", false)
         )
@@ -72,6 +80,8 @@ class HistoryStore(private val context: Context) {
             val obj = JSONObject().apply {
                 put("formatMode", prefs.formatMode.name)
                 put("embedSubtitles", prefs.embedSubtitles)
+                put("subtitlePreset", prefs.subtitlePreset.name)
+                put("includeAutoSubtitles", prefs.includeAutoSubtitles)
                 put("autoConvertAfterDownload", prefs.autoConvertAfterDownload)
                 put("useNightlyChannel", prefs.useNightlyChannel)
             }

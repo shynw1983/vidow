@@ -80,6 +80,8 @@ import com.vidfit.converter.model.DownloadFormatMode
 import com.vidfit.converter.model.DownloadResult
 import com.vidfit.converter.model.DownloadState
 import com.vidfit.converter.model.ParsedQualityOption
+import com.vidfit.converter.model.SubtitlePreset
+import com.vidfit.converter.model.SubtitleTrackOption
 import com.vidfit.converter.model.YtDlpUpdateState
 import com.vidfit.converter.ui.DownloadUiState
 import com.vidfit.converter.ui.theme.VidFitPalette
@@ -94,6 +96,12 @@ private fun ParsedQualityOption.localizedLabel(): String {
     }
 }
 
+private fun SubtitleTrackOption.chipLabel(): String {
+    val name = displayName.trim()
+    val showCode = !name.equals(langCode, ignoreCase = true) && !name.contains(langCode, ignoreCase = true)
+    return if (showCode) "$name ($langCode)" else name
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun BentoDownloadTab(
@@ -104,6 +112,9 @@ fun BentoDownloadTab(
     onFormatModeChange: (DownloadFormatMode) -> Unit,
     onSelectedMaxHeightChange: (Int?) -> Unit,
     onEmbedSubtitlesChange: (Boolean) -> Unit,
+    onSubtitlePresetChange: (SubtitlePreset) -> Unit,
+    onIncludeAutoSubtitlesChange: (Boolean) -> Unit,
+    onToggleSubtitleLang: (String) -> Unit,
     onAutoConvertChange: (Boolean) -> Unit,
     onStartDownload: () -> Unit,
     onCancelDownload: () -> Unit,
@@ -505,6 +516,16 @@ fun BentoDownloadTab(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
+                            val subSummaryText = when {
+                                parsed.officialSubtitles.isNotEmpty() && parsed.autoSubtitles.isNotEmpty() ->
+                                    stringResource(R.string.dl_sub_detected_both, parsed.officialSubtitles.size)
+                                parsed.officialSubtitles.isNotEmpty() ->
+                                    stringResource(R.string.dl_sub_detected_official, parsed.officialSubtitles.size)
+                                parsed.autoSubtitles.isNotEmpty() ->
+                                    stringResource(R.string.dl_sub_detected_auto_only)
+                                else ->
+                                    stringResource(R.string.dl_embed_subs_sub)
+                            }
                             Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
                                 Text(
                                     text = stringResource(R.string.dl_embed_subs_title),
@@ -513,7 +534,7 @@ fun BentoDownloadTab(
                                     color = colors.primaryText
                                 )
                                 Text(
-                                    text = stringResource(R.string.dl_embed_subs_sub),
+                                    text = subSummaryText,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.secondaryText
                                 )
@@ -522,6 +543,193 @@ fun BentoDownloadTab(
                                 checked = state.embedSubtitles,
                                 onCheckedChange = onEmbedSubtitlesChange
                             )
+                        }
+
+                        if (state.embedSubtitles) {
+                            var showAllOfficial by remember(parsed.url) { mutableStateOf(false) }
+                            var showAllAuto by remember(parsed.url) { mutableStateOf(false) }
+
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = colors.subtleSurface,
+                                border = BorderStroke(1.dp, colors.cardBorder),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.dl_sub_mode_label),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = colors.secondaryText
+                                    )
+
+                                    val visiblePresets = if (parsed.hasAnySubtitles) {
+                                        SubtitlePreset.entries
+                                    } else {
+                                        SubtitlePreset.entries.filter { it != SubtitlePreset.CUSTOM }
+                                    }
+
+                                    FlowRow(
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        visiblePresets.forEach { preset ->
+                                            FilterChip(
+                                                selected = state.subtitlePreset == preset,
+                                                onClick = { onSubtitlePresetChange(preset) },
+                                                colors = chipColors,
+                                                label = {
+                                                    val suffix = if (preset == SubtitlePreset.CUSTOM && state.selectedSubtitleLangs.isNotEmpty()) {
+                                                        " (${state.selectedSubtitleLangs.size})"
+                                                    } else {
+                                                        ""
+                                                    }
+                                                    Text(
+                                                        text = stringResource(preset.labelRes) + suffix,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                }
+                                            )
+                                        }
+                                    }
+
+                                    if (state.subtitlePreset == SubtitlePreset.CUSTOM) {
+                                        if (parsed.officialSubtitles.isNotEmpty()) {
+                                            Text(
+                                                text = stringResource(R.string.dl_sub_official_section),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = colors.secondaryText
+                                            )
+                                            val officialLimit = 10
+                                            val displayedOfficial = if (showAllOfficial || parsed.officialSubtitles.size <= officialLimit) {
+                                                parsed.officialSubtitles
+                                            } else {
+                                                parsed.officialSubtitles.take(officialLimit)
+                                            }
+                                            FlowRow(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                displayedOfficial.forEach { track ->
+                                                    val isSelected = track.langCode in state.selectedSubtitleLangs
+                                                    FilterChip(
+                                                        selected = isSelected,
+                                                        onClick = { onToggleSubtitleLang(track.langCode) },
+                                                        colors = chipColors,
+                                                        label = { Text(track.chipLabel(), style = MaterialTheme.typography.labelMedium) }
+                                                    )
+                                                }
+                                                if (!showAllOfficial && parsed.officialSubtitles.size > officialLimit) {
+                                                    FilterChip(
+                                                        selected = false,
+                                                        onClick = { showAllOfficial = true },
+                                                        colors = chipColors,
+                                                        label = {
+                                                            Text(
+                                                                text = stringResource(
+                                                                    R.string.dl_sub_show_more,
+                                                                    parsed.officialSubtitles.size - officialLimit
+                                                                ),
+                                                                style = MaterialTheme.typography.labelMedium,
+                                                                color = colors.accentText
+                                                            )
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        if (parsed.autoSubtitles.isNotEmpty() && (state.includeAutoSubtitles || parsed.officialSubtitles.isEmpty())) {
+                                            Text(
+                                                text = stringResource(R.string.dl_sub_auto_section),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = colors.secondaryText
+                                            )
+                                            val autoLimit = 8
+                                            val displayedAuto = if (showAllAuto || parsed.autoSubtitles.size <= autoLimit) {
+                                                parsed.autoSubtitles
+                                            } else {
+                                                parsed.autoSubtitles.take(autoLimit)
+                                            }
+                                            FlowRow(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                                            ) {
+                                                displayedAuto.forEach { track ->
+                                                    val isSelected = track.langCode in state.selectedSubtitleLangs
+                                                    FilterChip(
+                                                        selected = isSelected,
+                                                        onClick = { onToggleSubtitleLang(track.langCode) },
+                                                        colors = chipColors,
+                                                        label = { Text(track.chipLabel(), style = MaterialTheme.typography.labelMedium) }
+                                                    )
+                                                }
+                                                if (!showAllAuto && parsed.autoSubtitles.size > autoLimit) {
+                                                    FilterChip(
+                                                        selected = false,
+                                                        onClick = { showAllAuto = true },
+                                                        colors = chipColors,
+                                                        label = {
+                                                            Text(
+                                                                text = stringResource(
+                                                                    R.string.dl_sub_show_more,
+                                                                    parsed.autoSubtitles.size - autoLimit
+                                                                ),
+                                                                style = MaterialTheme.typography.labelMedium,
+                                                                color = colors.accentText
+                                                            )
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else if (parsed.officialSubtitles.isNotEmpty()) {
+                                        val previewNames = parsed.officialSubtitles
+                                            .take(5)
+                                            .joinToString(", ") { it.displayName }
+                                        val suffix = if (parsed.officialSubtitles.size > 5) "…" else ""
+                                        Text(
+                                            text = stringResource(R.string.dl_sub_available_preview, "$previewNames$suffix"),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = colors.secondaryText,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    if (state.subtitlePreset != SubtitlePreset.ALL_OFFICIAL || parsed.officialSubtitles.isEmpty()) {
+                                        HorizontalDivider(color = colors.cardBorder)
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                                Text(
+                                                    text = stringResource(R.string.dl_sub_include_auto_title),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = colors.primaryText
+                                                )
+                                                Text(
+                                                    text = stringResource(R.string.dl_sub_include_auto_sub),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = colors.secondaryText
+                                                )
+                                            }
+                                            Switch(
+                                                checked = state.includeAutoSubtitles,
+                                                onCheckedChange = onIncludeAutoSubtitlesChange
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 

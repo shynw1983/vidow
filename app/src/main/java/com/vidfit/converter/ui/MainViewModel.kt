@@ -31,6 +31,7 @@ import com.vidfit.converter.model.OutputVideoCodec
 import com.vidfit.converter.model.ParsedLinkInfo
 import com.vidfit.converter.model.QualityTier
 import com.vidfit.converter.model.ResolutionCap
+import com.vidfit.converter.model.SubtitlePreset
 import com.vidfit.converter.model.VideoInfo
 import com.vidfit.converter.model.YtDlpUpdateState
 import com.vidfit.converter.service.ConversionRepository
@@ -53,6 +54,9 @@ data class DownloadUiState(
     /** null means "最高画质" (default). */
     val selectedMaxHeight: Int? = null,
     val embedSubtitles: Boolean = false,
+    val subtitlePreset: SubtitlePreset = SubtitlePreset.MULTI_4,
+    val includeAutoSubtitles: Boolean = false,
+    val selectedSubtitleLangs: Set<String> = emptySet(),
     val autoConvertAfterDownload: Boolean = false,
     val downloadState: DownloadState = DownloadState.Idle,
     val recentDownloads: List<DownloadResult> = emptyList(),
@@ -96,6 +100,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         DownloadUiState(
             formatMode = initialPrefs.formatMode,
             embedSubtitles = initialPrefs.embedSubtitles,
+            subtitlePreset = initialPrefs.subtitlePreset,
+            includeAutoSubtitles = initialPrefs.includeAutoSubtitles,
             autoConvertAfterDownload = initialPrefs.autoConvertAfterDownload,
             useNightlyChannel = initialPrefs.useNightlyChannel,
             recentDownloads = historyStore.loadDownloads(),
@@ -236,6 +242,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 urlInput = extracted,
                 parsedLink = null,
                 selectedMaxHeight = null,
+                selectedSubtitleLangs = emptySet(),
                 downloadState = DownloadState.Idle
             )
         }
@@ -256,16 +263,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 urlInput = url,
                 parsedLink = null,
                 selectedMaxHeight = null,
+                selectedSubtitleLangs = emptySet(),
                 downloadState = DownloadState.Parsing
             )
         }
         viewModelScope.launch {
             val result = ytDlp.parseUrl(url, cookiesFile = cookieStore.combinedCookiesFile())
             result.onSuccess { info ->
-                _download.update {
-                    it.copy(
+                _download.update { cur ->
+                    val nextPreset = if (cur.subtitlePreset == SubtitlePreset.CUSTOM && !info.hasAnySubtitles) {
+                        SubtitlePreset.MULTI_4
+                    } else {
+                        cur.subtitlePreset
+                    }
+                    cur.copy(
                         parsedLink = info,
                         selectedMaxHeight = null,
+                        selectedSubtitleLangs = emptySet(),
+                        subtitlePreset = nextPreset,
                         downloadState = DownloadState.Idle
                     )
                 }
@@ -295,6 +310,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         persistDownloadPrefs()
     }
 
+    fun updateSubtitlePreset(preset: SubtitlePreset) {
+        _download.update { cur ->
+            val nextSelected = if (preset == SubtitlePreset.CUSTOM && cur.selectedSubtitleLangs.isEmpty()) {
+                val parsed = cur.parsedLink
+                val candidates = parsed?.officialSubtitles?.takeIf { it.isNotEmpty() }
+                    ?: parsed?.autoSubtitles.orEmpty()
+                val preferred = candidates.filter { track ->
+                    val base = track.langCode.lowercase().substringBefore('-').substringBefore('_')
+                    base in setOf("zh", "en", "ja", "ko")
+                }.take(2).map { it.langCode }.toSet()
+                preferred.ifEmpty { candidates.take(1).map { it.langCode }.toSet() }
+            } else {
+                cur.selectedSubtitleLangs
+            }
+            cur.copy(subtitlePreset = preset, selectedSubtitleLangs = nextSelected)
+        }
+        if (preset != SubtitlePreset.CUSTOM) {
+            persistDownloadPrefs()
+        }
+    }
+
+    fun updateIncludeAutoSubtitles(enabled: Boolean) {
+        _download.update { it.copy(includeAutoSubtitles = enabled) }
+        persistDownloadPrefs()
+    }
+
+    fun toggleSubtitleLang(langCode: String) {
+        _download.update { cur ->
+            val updated = cur.selectedSubtitleLangs.toMutableSet().apply {
+                if (!add(langCode)) remove(langCode)
+            }
+            cur.copy(
+                subtitlePreset = SubtitlePreset.CUSTOM,
+                selectedSubtitleLangs = updated
+            )
+        }
+    }
+
     fun updateAutoConvertAfterDownload(enabled: Boolean) {
         _download.update { it.copy(autoConvertAfterDownload = enabled) }
         persistDownloadPrefs()
@@ -313,11 +366,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _download.update {
                 it.copy(downloadState = DownloadState.Downloading(0, 0L, app.getString(R.string.dl_connecting)))
             }
+            val parsed = dl.parsedLink
+            val selectedIncludesAuto = parsed?.autoSubtitles?.any { it.langCode in dl.selectedSubtitleLangs } ?: false
             val result = ytDlp.download(
                 url = url,
                 mode = dl.formatMode,
                 selectedMaxHeight = dl.selectedMaxHeight,
                 embedSubtitles = dl.embedSubtitles,
+                subtitlePreset = dl.subtitlePreset,
+                selectedSubtitleLangs = dl.selectedSubtitleLangs,
+                includeAutoSubtitles = dl.includeAutoSubtitles,
+                hasOfficialSubtitles = parsed?.officialSubtitles?.isNotEmpty() ?: true,
+                selectedIncludesAutoTrack = selectedIncludesAuto,
                 cookiesFile = cookieStore.combinedCookiesFile(),
                 onProgress = { pct, eta, line ->
                     val cleanLine = line.trim().take(80).ifBlank { app.getString(R.string.dl_downloading_title) }
@@ -446,6 +506,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 urlInput = "",
                 parsedLink = null,
                 selectedMaxHeight = null,
+                selectedSubtitleLangs = emptySet(),
                 downloadState = DownloadState.Idle
             )
         }
@@ -479,6 +540,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val prefs = SavedDownloadPrefs(
             formatMode = dl.formatMode,
             embedSubtitles = dl.embedSubtitles,
+            subtitlePreset = if (dl.subtitlePreset == SubtitlePreset.CUSTOM) {
+                SubtitlePreset.MULTI_4
+            } else {
+                dl.subtitlePreset
+            },
+            includeAutoSubtitles = dl.includeAutoSubtitles,
             autoConvertAfterDownload = dl.autoConvertAfterDownload,
             useNightlyChannel = dl.useNightlyChannel
         )

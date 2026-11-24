@@ -13,9 +13,10 @@ import com.vidfit.converter.model.ConversionPreset
 import com.vidfit.converter.model.FrameRateCap
 import com.vidfit.converter.model.OutputVideoCodec
 import com.vidfit.converter.model.ResolutionCap
+import com.vidfit.converter.model.SubtitlePreset
 import com.vidfit.converter.model.VideoInfo
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -212,5 +213,47 @@ class BitrateCalculatorTest {
         assertEquals("VP9", YtDlpEngine.normalizeVideoCodec("vp09.00.51.08"))
         assertEquals("AAC", YtDlpEngine.normalizeAudioCodec("mp4a.40.2"))
         assertEquals("Opus", YtDlpEngine.normalizeAudioCodec("opus"))
+    }
+
+    @Test
+    fun ytDlpSubtitleResolver_handlesAllPresetsAndAutoGuardrails() {
+        val multi4 = YtDlpEngine.resolveSubtitleDownloadArgs(
+            preset = SubtitlePreset.MULTI_4,
+            selectedLangs = emptySet(),
+            systemLanguage = "ja",
+            includeAutoSubtitles = true
+        )
+        assertEquals("zh.*,en.*,ja.*,ko.*", multi4.subLangs)
+        assertTrue(multi4.writeAutoSubs)
+
+        val sysJa = YtDlpEngine.resolveSubtitleDownloadArgs(
+            preset = SubtitlePreset.SYSTEM_LANG,
+            selectedLangs = emptySet(),
+            systemLanguage = "ja-JP",
+            includeAutoSubtitles = false
+        )
+        assertEquals("ja.*", sysJa.subLangs)
+        assertFalse(sysJa.writeAutoSubs)
+
+        // ALL_OFFICIAL must never pair `all` with --write-auto-subs to prevent YouTube 429 rate-limits
+        val allOfficial = YtDlpEngine.resolveSubtitleDownloadArgs(
+            preset = SubtitlePreset.ALL_OFFICIAL,
+            selectedLangs = emptySet(),
+            systemLanguage = "zh",
+            includeAutoSubtitles = true,
+            hasOfficialSubtitles = true
+        )
+        assertEquals("all,-live_chat,-danmaku", allOfficial.subLangs)
+        assertFalse(allOfficial.writeAutoSubs)
+
+        val customWithAutoTrack = YtDlpEngine.resolveSubtitleDownloadArgs(
+            preset = SubtitlePreset.CUSTOM,
+            selectedLangs = linkedSetOf("ja", "zh-Hans"),
+            systemLanguage = "ja",
+            includeAutoSubtitles = false,
+            selectedIncludesAutoTrack = true
+        )
+        assertEquals("ja,zh-Hans", customWithAutoTrack.subLangs)
+        assertTrue(customWithAutoTrack.writeAutoSubs)
     }
 }
