@@ -1,43 +1,43 @@
 package com.vidfit.converter.model
 
-/**
- * One-tap scenario presets hiding codec complexity from everyday users.
- */
+import androidx.annotation.StringRes
+import com.vidfit.converter.R
+
 enum class ConversionPreset(
     val id: String,
-    val title: String,
-    val subtitle: String,
-    val badge: String
+    @StringRes val titleRes: Int,
+    @StringRes val subtitleRes: Int,
+    @StringRes val badgeRes: Int
 ) {
     UNIVERSAL_COMPAT(
         id = "universal_compat",
-        title = "万能兼容",
-        subtitle = "MP4 · H.264 · AAC · HDR转SDR · 旋正",
-        badge = "推荐"
+        titleRes = R.string.preset_universal_title,
+        subtitleRes = R.string.preset_universal_sub,
+        badgeRes = R.string.preset_universal_badge
     ),
     UPLOAD_25MB(
         id = "upload_25mb",
-        title = "压到 25MB 内",
-        subtitle = "适配邮件附件 / 常规上传限制",
-        badge = "上传"
+        titleRes = R.string.preset_25mb_title,
+        subtitleRes = R.string.preset_25mb_sub,
+        badgeRes = R.string.preset_25mb_badge
     ),
     DISCORD_10MB(
         id = "discord_10mb",
-        title = "压到 10MB 内",
-        subtitle = "适配 Discord / 聊天极速发送",
-        badge = "小体积"
+        titleRes = R.string.preset_10mb_title,
+        subtitleRes = R.string.preset_10mb_sub,
+        badgeRes = R.string.preset_10mb_badge
     ),
     SOCIAL_VERTICAL(
         id = "social_vertical",
-        title = "竖屏短视频 9:16",
-        subtitle = "1080p · 30fps · 抖音/小红书/Reels",
-        badge = "社媒"
+        titleRes = R.string.preset_vertical_title,
+        subtitleRes = R.string.preset_vertical_sub,
+        badgeRes = R.string.preset_vertical_badge
     ),
     HIGH_QUALITY_COMPAT(
         id = "hq_compat",
-        title = "高清兼容存档",
-        subtitle = "保留原分辨率与高码率，仅转 H.264 + SDR",
-        badge = "高清"
+        titleRes = R.string.preset_hq_title,
+        subtitleRes = R.string.preset_hq_sub,
+        badgeRes = R.string.preset_hq_badge
     );
 
     fun toConfig(trimStartMs: Long = 0L, trimEndMs: Long? = null): ConversionConfig = when (this) {

@@ -66,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,13 +74,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.vidfit.converter.R
 import com.vidfit.converter.data.CookieSite
 import com.vidfit.converter.model.DownloadFormatMode
 import com.vidfit.converter.model.DownloadResult
 import com.vidfit.converter.model.DownloadState
+import com.vidfit.converter.model.ParsedQualityOption
 import com.vidfit.converter.model.YtDlpUpdateState
 import com.vidfit.converter.ui.DownloadUiState
 import com.vidfit.converter.ui.theme.VidFitPalette
+import java.util.Locale
+
+@Composable
+private fun ParsedQualityOption.localizedLabel(): String {
+    return if (isPortrait) {
+        "$baseTag ${stringResource(R.string.dl_portrait_suffix)}"
+    } else {
+        baseTag
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -143,7 +156,6 @@ fun BentoDownloadTab(
         labelColor = colors.primaryText
     )
 
-    // Centered progress / result dialog for active downloads
     DownloadFocusDialog(
         state = state.downloadState,
         thumbnailUrl = state.parsedLink?.thumbnailUrl,
@@ -183,7 +195,7 @@ fun BentoDownloadTab(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "粘贴视频链接（或从 App 直接分享到 Vidow）",
+                        text = stringResource(R.string.dl_input_header),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = colors.primaryText
@@ -195,7 +207,7 @@ fun BentoDownloadTab(
                     onValueChange = onUrlChange,
                     placeholder = {
                         Text(
-                            "支持 YouTube、B站、X、TikTok、Instagram 等...",
+                            text = stringResource(R.string.dl_input_placeholder),
                             color = colors.secondaryText,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -204,7 +216,7 @@ fun BentoDownloadTab(
                     trailingIcon = {
                         if (state.urlInput.isNotEmpty()) {
                             IconButton(onClick = onClearLink) {
-                                Icon(Icons.Rounded.Clear, contentDescription = "清空", tint = colors.secondaryText)
+                                Icon(Icons.Rounded.Clear, contentDescription = stringResource(R.string.action_clear), tint = colors.secondaryText)
                             }
                         }
                     },
@@ -241,7 +253,7 @@ fun BentoDownloadTab(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(Modifier.width(6.dp))
-                        Text("粘贴剪贴板", color = colors.primaryText, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.dl_paste_btn), color = colors.primaryText, fontWeight = FontWeight.SemiBold)
                     }
 
                     Button(
@@ -263,18 +275,18 @@ fun BentoDownloadTab(
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(Modifier.width(6.dp))
-                            Text("解析中...", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.dl_parsing_btn), fontWeight = FontWeight.Bold)
                         } else {
                             Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("解析视频", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.dl_parse_btn), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
         }
 
-        // 2. Parsed Link Configuration Bento Card (with Thumbnail Preview + Dynamic Real Qualities!)
+        // 2. Parsed Link Card
         val parsed = state.parsedLink
         if (parsed != null) {
             Surface(
@@ -287,7 +299,6 @@ fun BentoDownloadTab(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Thumbnail preview with site & duration badges overlaid
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -299,7 +310,6 @@ fun BentoDownloadTab(
                             showPlayBadge = false,
                             modifier = Modifier.fillMaxSize()
                         )
-                        // Top-left source badge
                         Box(
                             modifier = Modifier
                                 .align(Alignment.TopStart)
@@ -314,7 +324,6 @@ fun BentoDownloadTab(
                                 color = Color.White
                             )
                         }
-                        // Bottom-right duration badge
                         if (parsed.durationSeconds > 0L) {
                             Box(
                                 modifier = Modifier
@@ -342,19 +351,19 @@ fun BentoDownloadTab(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "作者：${parsed.uploader}",
+                        text = stringResource(R.string.dl_uploader, parsed.uploader),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.secondaryText
                     )
 
-                    // Live-updating video/audio format & codec info pills based on current selection
+                    // Live-updating video/audio format & codec info pills
                     val activeQual = parsed.activeQuality(state.formatMode, state.selectedMaxHeight)
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (state.formatMode == DownloadFormatMode.AUDIO_M4A) {
-                            MediaSpecPill(text = "M4A 音频")
+                            MediaSpecPill(text = stringResource(R.string.dl_audio_m4a_pill))
                             MediaSpecPill(text = parsed.bestAudioCodec)
                             if (parsed.bestAudioBitrateKbps > 0) {
                                 MediaSpecPill(text = "${parsed.bestAudioBitrateKbps} kbps")
@@ -367,16 +376,14 @@ fun BentoDownloadTab(
                                 MediaSpecPill(text = "${activeQual.width}×${activeQual.height}")
                             }
                             MediaSpecPill(text = activeQual.ext)
-                            if (activeQual.videoCodec != "未知") {
-                                MediaSpecPill(text = activeQual.videoCodec)
-                            }
+                            activeQual.videoCodec?.let { MediaSpecPill(text = it) }
                             activeQual.audioCodec?.let { MediaSpecPill(text = it) }
                             if (activeQual.fps > 0) {
                                 MediaSpecPill(text = "${activeQual.fps} fps")
                             }
                             if (activeQual.bitrateKbps > 0) {
                                 val brLabel = if (activeQual.bitrateKbps >= 1000) {
-                                    String.format(java.util.Locale.US, "%.1f Mbps", activeQual.bitrateKbps / 1000.0)
+                                    String.format(Locale.US, "%.1f Mbps", activeQual.bitrateKbps / 1000.0)
                                 } else {
                                     "${activeQual.bitrateKbps} kbps"
                                 }
@@ -394,7 +401,7 @@ fun BentoDownloadTab(
                                         .padding(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
                                     Text(
-                                        text = "⚠ 建议下完后转 H.264 兼容",
+                                        text = stringResource(R.string.dl_non_universal_warn),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = colors.warningText
@@ -403,18 +410,15 @@ fun BentoDownloadTab(
                             }
                         } else {
                             MediaSpecPill(text = parsed.defaultExt)
-                            if (parsed.defaultVideoCodec != "未知") {
-                                MediaSpecPill(text = parsed.defaultVideoCodec)
-                            }
+                            parsed.defaultVideoCodec?.let { MediaSpecPill(text = it) }
                             MediaSpecPill(text = parsed.bestAudioCodec)
                         }
                     }
 
                     HorizontalDivider(color = colors.cardBorder)
 
-                    // Download Format Mode
                     Text(
-                        text = "下载类型",
+                        text = stringResource(R.string.dl_type_label),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.secondaryText
@@ -428,21 +432,20 @@ fun BentoDownloadTab(
                                 selected = state.formatMode == mode,
                                 onClick = { onFormatModeChange(mode) },
                                 colors = chipColors,
-                                label = { Text(mode.label, fontWeight = FontWeight.SemiBold) }
+                                label = { Text(stringResource(mode.labelRes), fontWeight = FontWeight.SemiBold) }
                             )
                         }
                     }
                     Text(
-                        text = state.formatMode.subtitle,
+                        text = stringResource(state.formatMode.subtitleRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.secondaryText
                     )
 
-                    // Dynamic Quality Chips matching the video's ACTUAL streams (Default: 最高画质)
                     if (state.formatMode != DownloadFormatMode.AUDIO_M4A) {
                         val modeQualities = parsed.qualitiesFor(state.formatMode)
                         Text(
-                            text = "选择画质（默认最高画质）",
+                            text = stringResource(R.string.dl_quality_label),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.secondaryText
@@ -456,8 +459,8 @@ fun BentoDownloadTab(
                                 onClick = { onSelectedMaxHeightChange(null) },
                                 colors = chipColors,
                                 label = {
-                                    val bestTag = modeQualities.firstOrNull()?.let { " (${it.label})" } ?: ""
-                                    Text("最高画质$bestTag", fontWeight = FontWeight.SemiBold)
+                                    val bestTag = modeQualities.firstOrNull()?.let { " (${it.localizedLabel()})" } ?: ""
+                                    Text(stringResource(R.string.dl_quality_best) + bestTag, fontWeight = FontWeight.SemiBold)
                                 }
                             )
                             modeQualities.forEach { q ->
@@ -466,7 +469,7 @@ fun BentoDownloadTab(
                                     selected = state.selectedMaxHeight == q.ytDlpHeight,
                                     onClick = { onSelectedMaxHeightChange(q.ytDlpHeight) },
                                     colors = chipColors,
-                                    label = { Text("${q.label}$sizeHint") }
+                                    label = { Text("${q.localizedLabel()}$sizeHint") }
                                 )
                             }
                         }
@@ -480,13 +483,13 @@ fun BentoDownloadTab(
                         ) {
                             Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
                                 Text(
-                                    text = "下载完自动进入格式转换 / 压大小",
+                                    text = stringResource(R.string.dl_auto_convert_title),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = colors.primaryText
                                 )
                                 Text(
-                                    text = "自动切换到 Bento 转换工作台进行兼容检测或控体积",
+                                    text = stringResource(R.string.dl_auto_convert_sub),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.secondaryText
                                 )
@@ -504,13 +507,13 @@ fun BentoDownloadTab(
                         ) {
                             Column(modifier = Modifier.weight(1f).padding(end = 10.dp)) {
                                 Text(
-                                    text = "尝试内嵌中/英字幕",
+                                    text = stringResource(R.string.dl_embed_subs_title),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = colors.primaryText
                                 )
                                 Text(
-                                    text = "源站有官方字幕时自动封装进视频",
+                                    text = stringResource(R.string.dl_embed_subs_sub),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = colors.secondaryText
                                 )
@@ -537,7 +540,13 @@ fun BentoDownloadTab(
                         Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(20.dp))
                         Spacer(Modifier.width(8.dp))
                         Text(
-                            text = if (state.formatMode == DownloadFormatMode.AUDIO_M4A) "立即下载音频" else "立即下载视频",
+                            text = stringResource(
+                                if (state.formatMode == DownloadFormatMode.AUDIO_M4A) {
+                                    R.string.dl_start_audio_btn
+                                } else {
+                                    R.string.dl_start_video_btn
+                                }
+                            ),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold
                         )
@@ -546,7 +555,7 @@ fun BentoDownloadTab(
             }
         }
 
-        // 3. Site Login / Cookie Management Bento Card (Bilibili HD, Xiaohongshu, Douyin, Weibo)
+        // 3. Site Login / Cookie Management Card
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = colors.cardBackground,
@@ -575,19 +584,20 @@ fun BentoDownloadTab(
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text(
-                                text = "站点登录（Cookie 增强）",
+                                text = stringResource(R.string.dl_cookie_card_title),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.primaryText
                             )
                             val loggedNames = CookieSite.entries
                                 .filter { state.loggedInSiteIds.contains(it.id) }
-                                .joinToString("、") { it.displayName }
+                                .map { stringResource(it.displayNameRes) }
+                                .joinToString(", ")
                             Text(
                                 text = if (loggedNames.isNotEmpty()) {
-                                    "已保存：$loggedNames"
+                                    stringResource(R.string.dl_cookie_saved_list, loggedNames)
                                 } else {
-                                    "登录 B站/小红书/抖音/微博 解锁高清与防拦截"
+                                    stringResource(R.string.dl_cookie_empty_hint)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (loggedNames.isNotEmpty()) colors.successAccent else colors.secondaryText
@@ -599,7 +609,7 @@ fun BentoDownloadTab(
                         onClick = { showCookieSheet = true },
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("管理登录", color = colors.accentText, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.dl_cookie_manage_btn), color = colors.accentText, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -613,7 +623,7 @@ fun BentoDownloadTab(
             }
         }
 
-        // 4. yt-dlp Core Engine Stable / Nightly Hot-Update Bento Card
+        // 4. yt-dlp Core Engine Stable / Nightly Hot-Update Card
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = colors.cardBackground,
@@ -631,13 +641,16 @@ fun BentoDownloadTab(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "yt-dlp 解析引擎",
+                            text = stringResource(R.string.dl_engine_title),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = colors.primaryText
                         )
                         Text(
-                            text = "当前版本：${state.ytDlpVersion ?: "初始化中..."}",
+                            text = stringResource(
+                                R.string.dl_engine_ver,
+                                state.ytDlpVersion ?: stringResource(R.string.dl_engine_initializing)
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.secondaryText
                         )
@@ -654,7 +667,7 @@ fun BentoDownloadTab(
                             Icon(Icons.Rounded.Refresh, contentDescription = null, tint = colors.accentText, modifier = Modifier.size(16.dp))
                         }
                         Spacer(Modifier.width(4.dp))
-                        Text("更新核心", color = colors.accentText, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.dl_engine_update_btn), color = colors.accentText, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -663,20 +676,20 @@ fun BentoDownloadTab(
                         selected = !state.useNightlyChannel,
                         onClick = { onToggleNightlyChannel(false) },
                         colors = chipColors,
-                        label = { Text("Stable 稳定版", fontWeight = FontWeight.SemiBold) }
+                        label = { Text(stringResource(R.string.dl_channel_stable), fontWeight = FontWeight.SemiBold) }
                     )
                     FilterChip(
                         selected = state.useNightlyChannel,
                         onClick = { onToggleNightlyChannel(true) },
                         colors = chipColors,
-                        label = { Text("Nightly 每日版（国内站点推荐）", fontWeight = FontWeight.SemiBold) }
+                        label = { Text(stringResource(R.string.dl_channel_nightly), fontWeight = FontWeight.SemiBold) }
                     )
                 }
 
                 when (val upd = state.updateState) {
                     is YtDlpUpdateState.Updated -> {
                         Text(
-                            text = "✓ 已热更新至最新版本：${upd.version}",
+                            text = stringResource(R.string.dl_update_done, upd.version),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.successAccent
@@ -684,7 +697,7 @@ fun BentoDownloadTab(
                     }
                     is YtDlpUpdateState.UpToDate -> {
                         Text(
-                            text = "✓ 当前已是最新（${upd.version}）",
+                            text = stringResource(R.string.dl_update_uptodate, upd.version),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.successAccent
                         )
@@ -701,7 +714,7 @@ fun BentoDownloadTab(
             }
         }
 
-        // 5. Recent Downloads List WITH real video thumbnails (persisted across restarts!)
+        // 5. Persisted Download History
         if (state.recentDownloads.isNotEmpty()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -709,13 +722,17 @@ fun BentoDownloadTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "已下载记录（${state.recentDownloads.size}）",
+                    text = stringResource(R.string.dl_recent_title, state.recentDownloads.size),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = colors.primaryText
                 )
                 TextButton(onClick = onClearDownloadHistory) {
-                    Text("清空记录", color = colors.secondaryText, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = stringResource(R.string.dl_clear_history),
+                        color = colors.secondaryText,
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
             }
             state.recentDownloads.forEach { item ->
@@ -764,7 +781,7 @@ fun BentoDownloadTab(
                             IconButton(onClick = { onRemoveDownloadItem(item) }) {
                                 Icon(
                                     imageVector = Icons.Rounded.DeleteOutline,
-                                    contentDescription = "移除记录",
+                                    contentDescription = stringResource(R.string.action_clear),
                                     tint = colors.secondaryText,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -787,20 +804,20 @@ fun BentoDownloadTab(
                                 ) {
                                     Icon(Icons.Rounded.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(Modifier.width(4.dp))
-                                    Text("转换/压大小", fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.dl_convert_cta), fontWeight = FontWeight.Bold)
                                 }
                             }
                             OutlinedButton(
                                 onClick = { onPlayDownloaded(item) },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(Icons.Rounded.PlayArrow, contentDescription = "播放", tint = colors.primaryText, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Rounded.PlayArrow, contentDescription = stringResource(R.string.action_play), tint = colors.primaryText, modifier = Modifier.size(18.dp))
                             }
                             OutlinedButton(
                                 onClick = { onShareDownloaded(item) },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(Icons.Rounded.Share, contentDescription = "分享", tint = colors.accentText, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Rounded.Share, contentDescription = stringResource(R.string.action_share), tint = colors.accentText, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -900,7 +917,7 @@ private fun DownloadFocusDialog(
                                 )
                                 if (state.etaSeconds > 0L) {
                                     Text(
-                                        text = "约剩 ${state.etaSeconds}s",
+                                        text = stringResource(R.string.dl_eta_remaining, state.etaSeconds),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = colors.secondaryText
                                     )
@@ -909,7 +926,7 @@ private fun DownloadFocusDialog(
                         }
                         Spacer(Modifier.height(14.dp))
                         Text(
-                            text = title?.take(36) ?: "正在下载媒体...",
+                            text = title?.take(36) ?: stringResource(R.string.dl_downloading_title),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = colors.primaryText,
@@ -934,7 +951,7 @@ private fun DownloadFocusDialog(
                                 .height(46.dp),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Text("取消下载", color = colors.primaryText, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.dl_cancel_btn), color = colors.primaryText, fontWeight = FontWeight.SemiBold)
                         }
                     }
 
@@ -942,7 +959,7 @@ private fun DownloadFocusDialog(
                         CircularProgressIndicator(color = colors.actionButtonBg)
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            text = "正在合并并保存到系统相册...",
+                            text = stringResource(R.string.dl_saving_msg),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = colors.primaryText
@@ -979,7 +996,7 @@ private fun DownloadFocusDialog(
                             Spacer(Modifier.height(12.dp))
                         }
                         Text(
-                            text = if (res.isAudioOnly) "音频已保存到音乐目录" else "视频已下载到相册",
+                            text = stringResource(if (res.isAudioOnly) R.string.dl_done_audio else R.string.dl_done_video),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = colors.primaryText
@@ -1008,7 +1025,7 @@ private fun DownloadFocusDialog(
                             ) {
                                 Icon(Icons.Rounded.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("去转换兼容格式 / 压大小", fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.dl_go_convert_btn), fontWeight = FontWeight.Bold)
                             }
                             Spacer(Modifier.height(10.dp))
                         }
@@ -1023,7 +1040,7 @@ private fun DownloadFocusDialog(
                                     .height(44.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("直接分享", color = colors.primaryText)
+                                Text(stringResource(R.string.action_share), color = colors.primaryText)
                             }
                             OutlinedButton(
                                 onClick = { onPlay(res) },
@@ -1032,12 +1049,12 @@ private fun DownloadFocusDialog(
                                     .height(44.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Text("播放", color = colors.primaryText)
+                                Text(stringResource(R.string.action_play), color = colors.primaryText)
                             }
                         }
                         Spacer(Modifier.height(4.dp))
                         TextButton(onClick = onDismiss) {
-                            Text("完成返回", color = colors.secondaryText)
+                            Text(stringResource(R.string.conv_done_back), color = colors.secondaryText)
                         }
                     }
 
@@ -1057,7 +1074,7 @@ private fun DownloadFocusDialog(
                         }
                         Spacer(Modifier.height(14.dp))
                         Text(
-                            text = "下载未完成",
+                            text = stringResource(R.string.dl_failed_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = colors.primaryText
@@ -1081,16 +1098,16 @@ private fun DownloadFocusDialog(
                                 contentColor = colors.actionButtonText
                             )
                         ) {
-                            Text("重试", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.action_retry), fontWeight = FontWeight.Bold)
                         }
                         TextButton(onClick = onDismiss) {
-                            Text("关闭", color = colors.secondaryText)
+                            Text(stringResource(R.string.action_close), color = colors.secondaryText)
                         }
                     }
 
                     DownloadState.Cancelled -> {
                         Text(
-                            text = "已取消下载",
+                            text = stringResource(R.string.dl_cancelled_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = colors.primaryText
@@ -1107,7 +1124,7 @@ private fun DownloadFocusDialog(
                                 contentColor = colors.actionButtonText
                             )
                         ) {
-                            Text("返回", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.action_back), fontWeight = FontWeight.Bold)
                         }
                     }
 

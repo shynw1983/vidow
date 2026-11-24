@@ -2,6 +2,8 @@ package com.vidfit.converter.data
 
 import android.content.Context
 import android.webkit.CookieManager
+import androidx.annotation.StringRes
+import com.vidfit.converter.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -11,15 +13,15 @@ import java.io.File
  */
 enum class CookieSite(
     val id: String,
-    val displayName: String,
-    val hint: String,
+    @StringRes val displayNameRes: Int,
+    @StringRes val hintRes: Int,
     val loginUrl: String,
-    val cookieUrls: List<Pair<String, String>> // (urlToQueryCookieManager, netscapeDomain)
+    val cookieUrls: List<Pair<String, String>>
 ) {
     BILIBILI(
         id = "bilibili",
-        displayName = "B站",
-        hint = "解锁 1080p60 / 4K / HDR",
+        displayNameRes = R.string.site_bilibili_name,
+        hintRes = R.string.site_bilibili_hint,
         loginUrl = "https://passport.bilibili.com/login",
         cookieUrls = listOf(
             "https://www.bilibili.com" to ".bilibili.com",
@@ -29,8 +31,8 @@ enum class CookieSite(
     ),
     XIAOHONGSHU(
         id = "xiaohongshu",
-        displayName = "小红书",
-        hint = "提升短链解析成功率",
+        displayNameRes = R.string.site_xhs_name,
+        hintRes = R.string.site_xhs_hint,
         loginUrl = "https://www.xiaohongshu.com/explore",
         cookieUrls = listOf(
             "https://www.xiaohongshu.com" to ".xiaohongshu.com",
@@ -39,8 +41,8 @@ enum class CookieSite(
     ),
     DOUYIN(
         id = "douyin",
-        displayName = "抖音",
-        hint = "减少风控与访客拦截",
+        displayNameRes = R.string.site_douyin_name,
+        hintRes = R.string.site_douyin_hint,
         loginUrl = "https://www.douyin.com/",
         cookieUrls = listOf(
             "https://www.douyin.com" to ".douyin.com",
@@ -49,8 +51,8 @@ enum class CookieSite(
     ),
     WEIBO(
         id = "weibo",
-        displayName = "微博",
-        hint = "绕过访客限制获取高清流",
+        displayNameRes = R.string.site_weibo_name,
+        hintRes = R.string.site_weibo_hint,
         loginUrl = "https://m.weibo.cn/",
         cookieUrls = listOf(
             "https://m.weibo.cn" to ".weibo.cn",
@@ -59,8 +61,8 @@ enum class CookieSite(
     ),
     YOUTUBE(
         id = "youtube",
-        displayName = "YouTube",
-        hint = "会员画质与年龄验证视频",
+        displayNameRes = R.string.site_youtube_name,
+        hintRes = R.string.site_youtube_hint,
         loginUrl = "https://m.youtube.com/",
         cookieUrls = listOf(
             "https://www.youtube.com" to ".youtube.com",
@@ -69,8 +71,8 @@ enum class CookieSite(
     ),
     TWITTER(
         id = "twitter",
-        displayName = "X / Twitter",
-        hint = "敏感内容与登录可见视频",
+        displayNameRes = R.string.site_twitter_name,
+        hintRes = R.string.site_twitter_hint,
         loginUrl = "https://x.com/i/flow/login",
         cookieUrls = listOf(
             "https://x.com" to ".x.com",

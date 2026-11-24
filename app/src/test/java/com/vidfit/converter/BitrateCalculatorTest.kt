@@ -3,6 +3,7 @@ package com.vidfit.converter
 import com.vidfit.converter.data.HistoryStore
 import com.vidfit.converter.data.SiteCookieStore
 import com.vidfit.converter.domain.BitrateCalculator
+import com.vidfit.converter.domain.EncodingNotice
 import com.vidfit.converter.engine.YtDlpEngine
 import com.vidfit.converter.model.AspectRatioOption
 import com.vidfit.converter.model.CompatibilityIssue
@@ -94,7 +95,7 @@ class BitrateCalculatorTest {
         val plan = BitrateCalculator.buildPlan(info, config)
 
         assertTrue("Expected estimated size <= 10.2MB, got ${plan.estimatedSizeMb}", plan.estimatedSizeMb <= 10.2)
-        assertNotNull(plan.autoDownscaledNotice)
+        assertTrue(plan.notice is EncodingNotice.AutoDownscaled)
         assertTrue(minOf(plan.outputWidth, plan.outputHeight) <= 480)
         assertEquals(0, plan.outputWidth % 8)
         assertEquals(0, plan.outputHeight % 8)
@@ -118,7 +119,7 @@ class BitrateCalculatorTest {
         assertEquals(1080, plan.outputWidth)
         assertEquals(1920, plan.outputHeight)
         assertTrue("Small 2.1MB clip must not inflate near 25MB, got ${plan.estimatedSizeMb}", plan.estimatedSizeMb < 4.0)
-        assertNotNull(plan.autoDownscaledNotice)
+        assertTrue(plan.notice is EncodingNotice.AlreadyUnderTarget)
     }
 
     @Test
@@ -176,10 +177,10 @@ class BitrateCalculatorTest {
 
     @Test
     fun ytDlpQualityLabel_handlesPortraitAndLandscapeResolutions() {
-        assertEquals("720p 竖屏", YtDlpEngine.formatQualityLabel(720, 1280))
-        assertEquals("1080p", YtDlpEngine.formatQualityLabel(1920, 1080))
-        assertEquals("4K", YtDlpEngine.formatQualityLabel(3840, 2160))
-        assertEquals("480p 竖屏", YtDlpEngine.formatQualityLabel(480, 852))
+        assertEquals("720p" to true, YtDlpEngine.computeResolutionTag(720, 1280))
+        assertEquals("1080p" to false, YtDlpEngine.computeResolutionTag(1920, 1080))
+        assertEquals("4K" to false, YtDlpEngine.computeResolutionTag(3840, 2160))
+        assertEquals("480p" to true, YtDlpEngine.computeResolutionTag(480, 852))
     }
 
     @Test

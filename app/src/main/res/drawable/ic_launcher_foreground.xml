@@ -8,8 +8,8 @@
     <group
         android:pivotX="54"
         android:pivotY="54"
-        android:scaleX="0.86"
-        android:scaleY="0.86">
+        android:scaleX="1.05"
+        android:scaleY="1.05">
         <!-- Back translucent ribbon forming the right W wing (Share upward) -->
         <path
             android:fillAlpha="0.74"

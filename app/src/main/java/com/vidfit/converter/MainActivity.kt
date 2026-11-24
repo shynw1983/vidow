@@ -158,7 +158,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun shareVideo(result: ConversionResult) {
-        shareMediaUri(result.outputUri, "video/mp4", "分享转换后的视频")
+        shareMediaUri(result.outputUri, "video/mp4", getString(R.string.share_chooser_video))
     }
 
     private fun playVideo(result: ConversionResult) {
@@ -166,7 +166,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun shareDownloadedMedia(result: DownloadResult) {
-        shareMediaUri(result.uri, result.mimeType, "分享下载的媒体")
+        shareMediaUri(result.uri, result.mimeType, getString(R.string.share_chooser_media))
     }
 
     private fun playDownloadedMedia(result: DownloadResult) {

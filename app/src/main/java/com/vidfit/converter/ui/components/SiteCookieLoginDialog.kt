@@ -40,7 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,11 +52,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.vidfit.converter.R
 import com.vidfit.converter.data.CookieSite
 import com.vidfit.converter.ui.theme.VidFitPalette
 
@@ -99,20 +100,20 @@ fun CookieManagerBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "站点登录与 Cookie 管理",
+                    text = stringResource(R.string.cookie_sheet_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = colors.primaryText
                 )
                 if (loggedInSiteIds.isNotEmpty()) {
                     TextButton(onClick = onClearAll) {
-                        Text("全部清除", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.cookie_clear_all), color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
 
             Text(
-                text = "在内置浏览器里正常登录对应网站并点击「保存 Cookie」，即可解锁高清画质并显著提升国内平台解析成功率。所有 Cookie 仅存于本机私有目录。",
+                text = stringResource(R.string.cookie_sheet_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.secondaryText
             )
@@ -135,7 +136,7 @@ fun CookieManagerBottomSheet(
                         Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = site.displayName,
+                                    text = stringResource(site.displayNameRes),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = colors.primaryText
@@ -156,7 +157,7 @@ fun CookieManagerBottomSheet(
                                         )
                                         Spacer(Modifier.width(3.dp))
                                         Text(
-                                            text = "已保存",
+                                            text = stringResource(R.string.cookie_saved_badge),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = colors.successText
@@ -166,7 +167,7 @@ fun CookieManagerBottomSheet(
                             }
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = site.hint,
+                                text = stringResource(site.hintRes),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.secondaryText
                             )
@@ -176,7 +177,7 @@ fun CookieManagerBottomSheet(
                             IconButton(onClick = { onClearSite(site) }) {
                                 Icon(
                                     imageVector = Icons.Rounded.DeleteOutline,
-                                    contentDescription = "清除",
+                                    contentDescription = stringResource(R.string.action_clear),
                                     tint = colors.secondaryText
                                 )
                             }
@@ -196,7 +197,10 @@ fun CookieManagerBottomSheet(
                                 modifier = Modifier.size(15.dp)
                             )
                             Spacer(Modifier.width(4.dp))
-                            Text(if (isLoggedIn) "重登" else "登录", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = stringResource(if (isLoggedIn) R.string.cookie_relogin_btn else R.string.cookie_login_btn),
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
@@ -230,7 +234,6 @@ fun SiteCookieLoginDialog(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // Top bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -239,17 +242,17 @@ fun SiteCookieLoginDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
-                    Icon(Icons.Rounded.Close, contentDescription = "关闭", tint = colors.primaryText)
+                    Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.action_close), tint = colors.primaryText)
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "登录 ${site.displayName}",
+                        text = stringResource(R.string.cookie_login_title, stringResource(site.displayNameRes)),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = colors.primaryText
                     )
                     Text(
-                        text = if (desktopMode) "桌面版视图（不易跳 App）" else "手机版视图",
+                        text = stringResource(if (desktopMode) R.string.cookie_desktop_mode else R.string.cookie_mobile_mode),
                         style = MaterialTheme.typography.labelSmall,
                         color = colors.secondaryText
                     )
@@ -265,7 +268,7 @@ fun SiteCookieLoginDialog(
                 ) {
                     Icon(
                         imageVector = if (desktopMode) Icons.Rounded.PhoneAndroid else Icons.Rounded.Computer,
-                        contentDescription = "切换桌面/手机模式",
+                        contentDescription = null,
                         tint = colors.accentText
                     )
                 }
@@ -278,7 +281,7 @@ fun SiteCookieLoginDialog(
                         contentColor = colors.actionButtonText
                     )
                 ) {
-                    Text("保存 Cookie", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.cookie_save_btn), fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -289,7 +292,6 @@ fun SiteCookieLoginDialog(
                 )
             }
 
-            // Helpful tip bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -297,13 +299,12 @@ fun SiteCookieLoginDialog(
                     .padding(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 Text(
-                    text = "请在下方页面正常完成登录（若弹出 App 跳转提示可点取消），登录成功后点右上角「保存 Cookie」。",
+                    text = stringResource(R.string.cookie_webview_tip),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.secondaryText
                 )
             }
 
-            // Interactive WebView
             AndroidView(
                 factory = { ctx ->
                     WebView(ctx).apply {
@@ -329,7 +330,6 @@ fun SiteCookieLoginDialog(
                                 request: WebResourceRequest?
                             ): Boolean {
                                 val scheme = request?.url?.scheme?.lowercase().orEmpty()
-                                // Block custom app deep-link schemes (snssdk://, bilibili://, xhsdiscover://) so login stays inside WebView
                                 return scheme != "http" && scheme != "https"
                             }
                         }

@@ -1,32 +1,32 @@
 package com.vidfit.converter.model
 
 import android.net.Uri
+import androidx.annotation.StringRes
+import com.vidfit.converter.R
 
-enum class AppTab(val label: String) {
-    DOWNLOAD("视频下载"),
-    CONVERT("格式转换")
+enum class AppTab(@StringRes val labelRes: Int) {
+    DOWNLOAD(R.string.tab_download),
+    CONVERT(R.string.tab_convert)
 }
 
 enum class DownloadFormatMode(
-    val label: String,
-    val subtitle: String
+    @StringRes val labelRes: Int,
+    @StringRes val subtitleRes: Int
 ) {
-    VIDEO_MP4("兼容视频 MP4", "优先直下原生 H.264 + AAC 的 MP4，下完即播免转码"),
-    VIDEO_BEST("最高原画", "不限编码（VP9 / AV1 / 4K HDR），追求极限画质存档"),
-    AUDIO_M4A("仅提取音频", "提取高质量 M4A 音频保存到音乐目录")
+    VIDEO_MP4(R.string.dl_mode_mp4_label, R.string.dl_mode_mp4_sub),
+    VIDEO_BEST(R.string.dl_mode_best_label, R.string.dl_mode_best_sub),
+    AUDIO_M4A(R.string.dl_mode_audio_label, R.string.dl_mode_audio_sub)
 }
 
-/**
- * A concrete video quality tier actually offered by the parsed source video,
- * enriched with format container, video/audio codec, fps, bitrate, and estimated size.
- */
 data class ParsedQualityOption(
     val ytDlpHeight: Int,
     val width: Int,
     val height: Int,
-    val label: String,
+    /** Language-neutral base resolution tag (e.g. "1080p", "720p", "4K"). */
+    val baseTag: String,
+    val isPortrait: Boolean = false,
     val ext: String = "MP4",
-    val videoCodec: String = "未知",
+    val videoCodec: String? = null,
     val audioCodec: String? = null,
     val fps: Int = 0,
     val bitrateKbps: Int = 0,
@@ -41,14 +41,12 @@ data class ParsedLinkInfo(
     val extractor: String,
     val thumbnailUrl: String?,
     val defaultExt: String = "MP4",
-    val defaultVideoCodec: String = "未知",
+    val defaultVideoCodec: String? = null,
     val bestAudioCodec: String = "AAC",
     val bestAudioExt: String = "M4A",
     val bestAudioBitrateKbps: Int = 0,
     val bestAudioSizeBytes: Long? = null,
-    /** Quality options ranked with H.264 / MP4 priority (matches VIDEO_MP4 mode). */
     val compatQualities: List<ParsedQualityOption> = emptyList(),
-    /** Quality options ranked purely by highest bitrate/quality (matches VIDEO_BEST mode). */
     val bestQualities: List<ParsedQualityOption> = emptyList()
 ) {
     fun qualitiesFor(mode: DownloadFormatMode): List<ParsedQualityOption> = when (mode) {

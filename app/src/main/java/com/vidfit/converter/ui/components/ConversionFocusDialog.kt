@@ -37,20 +37,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.vidfit.converter.R
 import com.vidfit.converter.model.ConversionResult
 import com.vidfit.converter.model.ConversionState
 import com.vidfit.converter.ui.theme.VidFitPalette
 
-/**
- * Centered high-contrast focus modal dialog shown whenever a conversion is active,
- * finished, cancelled, or failed — guaranteeing the user immediately sees progress.
- */
 @Composable
 fun ConversionFocusDialog(
     state: ConversionState,
@@ -90,10 +88,7 @@ fun ConversionFocusDialog(
             ) {
                 when (state) {
                     is ConversionState.Converting -> {
-                        ConvertingDialogBody(
-                            state = state,
-                            onCancel = onCancel
-                        )
+                        ConvertingDialogBody(state = state, onCancel = onCancel)
                     }
                     is ConversionState.Success -> {
                         SuccessDialogBody(
@@ -105,7 +100,7 @@ fun ConversionFocusDialog(
                     }
                     is ConversionState.Failed -> {
                         ErrorDialogBody(
-                            title = "转换未完成",
+                            title = stringResource(R.string.conv_failed_title),
                             message = state.message,
                             showRetry = true,
                             onRetry = onRetry,
@@ -114,8 +109,8 @@ fun ConversionFocusDialog(
                     }
                     is ConversionState.Cancelled -> {
                         ErrorDialogBody(
-                            title = "已取消转换",
-                            message = "你可以调整参数后重新开始。",
+                            title = stringResource(R.string.conv_cancelled_title),
+                            message = stringResource(R.string.conv_cancelled_desc),
                             showRetry = false,
                             onRetry = onRetry,
                             onDismiss = onDismiss
@@ -187,7 +182,7 @@ private fun ConvertingDialogBody(
     )
     Spacer(Modifier.height(6.dp))
     Text(
-        text = "硬件加速处理中，可切后台运行并在通知栏查看实时进度",
+        text = stringResource(R.string.conv_bg_hint),
         style = MaterialTheme.typography.bodySmall,
         color = colors.secondaryText,
         textAlign = TextAlign.Center
@@ -200,7 +195,11 @@ private fun ConvertingDialogBody(
             .height(46.dp),
         shape = RoundedCornerShape(14.dp)
     ) {
-        Text("取消转换", color = colors.primaryText, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = stringResource(R.string.conv_cancel_btn),
+            color = colors.primaryText,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
@@ -229,21 +228,20 @@ private fun SuccessDialogBody(
 
     Spacer(Modifier.height(14.dp))
     Text(
-        text = "转换完成并已存入相册",
+        text = stringResource(R.string.conv_done_title),
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold,
         color = colors.primaryText
     )
     Spacer(Modifier.height(4.dp))
     Text(
-        text = "Movies/Vidow · 用时 ${formatDuration(result.elapsedMs)}",
+        text = stringResource(R.string.conv_done_meta, formatDuration(result.elapsedMs)),
         style = MaterialTheme.typography.bodySmall,
         color = colors.secondaryText
     )
 
     Spacer(Modifier.height(18.dp))
 
-    // Before -> After high-contrast comparison card
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -253,7 +251,7 @@ private fun SuccessDialogBody(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(horizontalAlignment = Alignment.Start) {
-            Text("原体积", style = MaterialTheme.typography.labelSmall, color = colors.secondaryText)
+            Text(stringResource(R.string.conv_before_label), style = MaterialTheme.typography.labelSmall, color = colors.secondaryText)
             Text(
                 text = formatFileSize(result.originalSizeBytes),
                 style = MaterialTheme.typography.titleMedium,
@@ -268,7 +266,7 @@ private fun SuccessDialogBody(
             modifier = Modifier.size(20.dp)
         )
         Column(horizontalAlignment = Alignment.Start) {
-            Text("新体积", style = MaterialTheme.typography.labelSmall, color = colors.secondaryText)
+            Text(stringResource(R.string.conv_after_label), style = MaterialTheme.typography.labelSmall, color = colors.secondaryText)
             Text(
                 text = formatFileSize(result.outputSizeBytes),
                 style = MaterialTheme.typography.titleMedium,
@@ -296,9 +294,9 @@ private fun SuccessDialogBody(
     }
 
     Spacer(Modifier.height(10.dp))
+    val sdrTag = if (result.convertedHdrToSdr) stringResource(R.string.conv_converted_sdr) else ""
     Text(
-        text = "${result.outputWidth}×${result.outputHeight} · ${result.codecLabel}" +
-            (if (result.convertedHdrToSdr) " · 已转 SDR" else ""),
+        text = "${result.outputWidth}×${result.outputHeight} · ${result.codecLabel}$sdrTag",
         style = MaterialTheme.typography.bodySmall,
         color = colors.secondaryText
     )
@@ -317,7 +315,7 @@ private fun SuccessDialogBody(
     ) {
         Icon(Icons.Rounded.Share, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text("直接分享上传", fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.conv_share_now), fontWeight = FontWeight.Bold)
     }
 
     Spacer(Modifier.height(10.dp))
@@ -334,7 +332,7 @@ private fun SuccessDialogBody(
         ) {
             Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
-            Text("播放检查", color = colors.primaryText)
+            Text(stringResource(R.string.conv_play_check), color = colors.primaryText)
         }
         OutlinedButton(
             onClick = onDone,
@@ -343,7 +341,7 @@ private fun SuccessDialogBody(
                 .height(44.dp),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Text("完成返回", color = colors.primaryText)
+            Text(stringResource(R.string.conv_done_back), color = colors.primaryText)
         }
     }
 }
@@ -397,11 +395,11 @@ private fun ErrorDialogBody(
                 contentColor = colors.actionButtonText
             )
         ) {
-            Text("重试转换", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.conv_retry_btn), fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(6.dp))
         TextButton(onClick = onDismiss) {
-            Text("返回调整参数", color = colors.secondaryText)
+            Text(stringResource(R.string.conv_back_adjust), color = colors.secondaryText)
         }
     } else {
         Button(
@@ -415,7 +413,7 @@ private fun ErrorDialogBody(
                 contentColor = colors.actionButtonText
             )
         ) {
-            Text("返回", fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.action_back), fontWeight = FontWeight.Bold)
         }
     }
 }

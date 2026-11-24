@@ -1,6 +1,7 @@
 package com.vidfit.converter.engine
 
 import android.content.Context
+import com.vidfit.converter.R
 import com.vidfit.converter.model.DownloadFormatMode
 import com.vidfit.converter.model.ParsedLinkInfo
 import com.vidfit.converter.model.ParsedQualityOption
@@ -17,11 +18,6 @@ import java.io.File
 import java.util.Locale
 import java.util.UUID
 
-/**
- * Wraps `youtubedl-android` (yt-dlp + FFmpeg) for YTDLnis-style URL parsing,
- * downloading (with H.264-priority compatible MP4 mode and optional cookies.txt),
- * cancellation, and Stable/Nightly core hot-updates.
- */
 class YtDlpEngine(private val appContext: Context) {
 
     private val initMutex = Mutex()
@@ -54,7 +50,10 @@ class YtDlpEngine(private val appContext: Context) {
             val initResult = ensureInitialized()
             if (initResult.isFailure) {
                 return@withContext YtDlpUpdateState.Failed(
-                    "核心引擎初始化失败：${initResult.exceptionOrNull()?.localizedMessage ?: "未知错误"}"
+                    appContext.getString(
+                        R.string.dl_err_engine_init,
+                        initResult.exceptionOrNull()?.localizedMessage ?: "Unknown"
+                    )
                 )
             }
             try {
@@ -65,14 +64,16 @@ class YtDlpEngine(private val appContext: Context) {
                 }
                 val status = YoutubeDL.getInstance().updateYoutubeDL(appContext, channel)
                 val ver = runCatching { YoutubeDL.getInstance().version(appContext) }.getOrNull().orEmpty()
-                val label = if (useNightly) "Nightly $ver" else ver.ifBlank { "最新版" }
+                val label = if (useNightly) "Nightly $ver" else ver.ifBlank { "latest" }
                 when (status) {
                     YoutubeDL.UpdateStatus.DONE -> YtDlpUpdateState.Updated(label.trim())
                     YoutubeDL.UpdateStatus.ALREADY_UP_TO_DATE -> YtDlpUpdateState.UpToDate(label.trim())
-                    null -> YtDlpUpdateState.Failed("未获取到更新状态，请检查网络连接")
+                    null -> YtDlpUpdateState.Failed(appContext.getString(R.string.dl_err_update_null))
                 }
             } catch (e: Exception) {
-                YtDlpUpdateState.Failed("更新失败：${e.localizedMessage ?: "请检查网络或代理"}")
+                YtDlpUpdateState.Failed(
+                    appContext.getString(R.string.dl_err_update_failed, e.localizedMessage ?: "Network error")
+                )
             }
         }
 
@@ -100,7 +101,6 @@ class YtDlpEngine(private val appContext: Context) {
 
             val allFormats = info.formats.orEmpty()
 
-            // Find best standalone audio stream (used when pairing with DASH video-only streams)
             val audioOnlyFormats = allFormats.filter { fmt ->
                 (fmt.vcodec == null || fmt.vcodec.equals("none", ignoreCase = true)) &&
                     !fmt.acodec.isNullOrBlank() &&
@@ -133,7 +133,7 @@ class YtDlpEngine(private val appContext: Context) {
             ): ParsedQualityOption {
                 val w = fmt.width.coerceAtLeast(0)
                 val h = fmt.height
-                val vCodec = normalizeVideoCodec(fmt.vcodec) ?: "未知"
+                val vCodec = normalizeVideoCodec(fmt.vcodec)
                 val hasEmbeddedAudio = !fmt.acodec.isNullOrBlank() && !fmt.acodec.equals("none", ignoreCase = true)
                 val aCodec = if (hasEmbeddedAudio) {
                     normalizeAudioCodec(fmt.acodec)
@@ -152,11 +152,13 @@ class YtDlpEngine(private val appContext: Context) {
                     else -> null
                 }
 
+                val (baseTag, isPortrait) = computeResolutionTag(width = w, height = h)
                 return ParsedQualityOption(
                     ytDlpHeight = h,
                     width = w,
                     height = h,
-                    label = formatQualityLabel(width = w, height = h),
+                    baseTag = baseTag,
+                    isPortrait = isPortrait,
                     ext = displayExt,
                     videoCodec = vCodec,
                     audioCodec = aCodec,
@@ -168,7 +170,6 @@ class YtDlpEngine(private val appContext: Context) {
 
             val groupedByHeight = videoFormats.groupBy { it.height }
 
-            // 1. Compatible MP4 ranking: strongly prefer H.264 + MP4 per height
             val compatQualities = groupedByHeight.map { (_, list) ->
                 val chosen = list.maxWithOrNull(
                     compareBy<VideoFormat>(
@@ -181,7 +182,6 @@ class YtDlpEngine(private val appContext: Context) {
                 toQualityOption(chosen, audioForCompat, forceMp4MergeLabel = true)
             }.sortedByDescending { it.ytDlpHeight }
 
-            // 2. Highest original quality ranking: prefer highest bitrate/size regardless of codec
             val bestQualities = groupedByHeight.map { (_, list) ->
                 val chosen = list.maxWithOrNull(
                     compareBy<VideoFormat>(
@@ -195,15 +195,14 @@ class YtDlpEngine(private val appContext: Context) {
 
             ParsedLinkInfo(
                 url = url,
-                title = info.title?.takeIf { it.isNotBlank() } ?: "未命名视频",
-                uploader = info.uploader?.takeIf { it.isNotBlank() } ?: (info.extractor ?: "网络视频"),
+                title = info.title?.takeIf { it.isNotBlank() } ?: appContext.getString(R.string.dl_unnamed_video),
+                uploader = info.uploader?.takeIf { it.isNotBlank() } ?: (info.extractor ?: "Web"),
                 durationSeconds = durationSec,
                 extractor = info.extractorKey ?: info.extractor ?: "Web",
                 thumbnailUrl = safeThumbnail,
                 defaultExt = (info.ext ?: "mp4").uppercase(Locale.US),
                 defaultVideoCodec = compatQualities.firstOrNull()?.videoCodec
-                    ?: bestQualities.firstOrNull()?.videoCodec
-                    ?: "未知",
+                    ?: bestQualities.firstOrNull()?.videoCodec,
                 bestAudioCodec = bestAudioCodec,
                 bestAudioExt = bestAudioExt,
                 bestAudioBitrateKbps = bestAudioAbr,
@@ -280,7 +279,7 @@ class YtDlpEngine(private val appContext: Context) {
             val outputFile = workDir.listFiles()
                 ?.filter { it.isFile && !it.name.endsWith(".part") && !it.name.endsWith(".ytdl") && it.length() > 0L }
                 ?.maxByOrNull { it.length() }
-                ?: error("下载完成但未找到输出媒体文件")
+                ?: error(appContext.getString(R.string.dl_err_no_output))
 
             Result.success(outputFile)
         } catch (e: Exception) {
@@ -319,8 +318,8 @@ class YtDlpEngine(private val appContext: Context) {
             return URL_REGEX.find(rawText.trim())?.value?.trimEnd(')', ']', '.', ',', '，', '。')
         }
 
-        fun formatQualityLabel(width: Int, height: Int): String {
-            if (width <= 0) return "${height}p"
+        fun computeResolutionTag(width: Int, height: Int): Pair<String, Boolean> {
+            if (width <= 0) return "${height}p" to false
             val isPortrait = height > width
             val shortSide = minOf(width, height)
             val baseTag = when {
@@ -328,7 +327,7 @@ class YtDlpEngine(private val appContext: Context) {
                 shortSide in 1400..1500 -> "2K"
                 else -> "${shortSide}p"
             }
-            return if (isPortrait) "$baseTag 竖屏" else baseTag
+            return baseTag to isPortrait
         }
 
         fun normalizeVideoCodec(raw: String?): String? {

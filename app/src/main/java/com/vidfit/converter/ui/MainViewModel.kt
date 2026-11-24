@@ -4,6 +4,7 @@ import android.app.Application
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.vidfit.converter.R
 import com.vidfit.converter.VidFitApp
 import com.vidfit.converter.data.CookieSite
 import com.vidfit.converter.data.HistoryStore
@@ -178,10 +179,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val count = cookieStore.captureFromWebView(site)
             val updatedIds = cookieStore.getLoggedInSiteIds()
+            val siteName = app.getString(site.displayNameRes)
             val notice = if (count > 0) {
-                "✓ 已保存 ${site.displayName} 登录态（$count 项 Cookie），解析与下载时自动生效"
+                app.getString(R.string.cookie_notice_saved, siteName, count)
             } else {
-                "未检测到 ${site.displayName} 的登录 Cookie，请确认已在页面完成登录"
+                app.getString(R.string.cookie_notice_empty, siteName)
             }
             _download.update {
                 it.copy(loggedInSiteIds = updatedIds, cookieNotice = notice)
@@ -192,10 +194,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearSiteCookies(site: CookieSite) {
         viewModelScope.launch {
             cookieStore.clearSite(site)
+            val siteName = app.getString(site.displayNameRes)
             _download.update {
                 it.copy(
                     loggedInSiteIds = cookieStore.getLoggedInSiteIds(),
-                    cookieNotice = "已清除 ${site.displayName} 的本地 Cookie"
+                    cookieNotice = app.getString(R.string.cookie_notice_cleared, siteName)
                 )
             }
         }
@@ -207,7 +210,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _download.update {
                 it.copy(
                     loggedInSiteIds = emptySet(),
-                    cookieNotice = "已清除全部站点 Cookie"
+                    cookieNotice = app.getString(R.string.cookie_notice_cleared_all)
                 )
             }
         }
@@ -244,7 +247,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val url = YtDlpEngine.extractFirstUrl(raw) ?: raw
         if (url.isBlank()) {
             _download.update {
-                it.copy(downloadState = DownloadState.Failed("请先粘贴视频链接（支持 YouTube、B站、小红书、抖音、微博、X 等）"))
+                it.copy(downloadState = DownloadState.Failed(app.getString(R.string.dl_err_empty_url)))
             }
             return
         }
@@ -270,7 +273,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _download.update {
                     it.copy(
                         downloadState = DownloadState.Failed(
-                            "解析失败：${err.localizedMessage ?: "未知错误"}\n提示：国内平台可先在下方「站点登录」保存 Cookie 或切 Nightly 更新核心"
+                            app.getString(R.string.dl_err_parse, err.localizedMessage ?: "Unknown")
                         )
                     )
                 }
@@ -301,14 +304,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val dl = _download.value
         val url = dl.parsedLink?.url ?: YtDlpEngine.extractFirstUrl(dl.urlInput) ?: dl.urlInput.trim()
         if (url.isBlank()) {
-            _download.update { it.copy(downloadState = DownloadState.Failed("请先输入有效视频链接")) }
+            _download.update { it.copy(downloadState = DownloadState.Failed(app.getString(R.string.dl_err_empty_url))) }
             return
         }
 
         activeDownloadJob?.cancel()
         activeDownloadJob = viewModelScope.launch {
             _download.update {
-                it.copy(downloadState = DownloadState.Downloading(0, 0L, "正在连接并拉取媒体流..."))
+                it.copy(downloadState = DownloadState.Downloading(0, 0L, app.getString(R.string.dl_connecting)))
             }
             val result = ytDlp.download(
                 url = url,
@@ -317,7 +320,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 embedSubtitles = dl.embedSubtitles,
                 cookiesFile = cookieStore.combinedCookiesFile(),
                 onProgress = { pct, eta, line ->
-                    val cleanLine = line.trim().take(80).ifBlank { "正在下载媒体..." }
+                    val cleanLine = line.trim().take(80).ifBlank { app.getString(R.string.dl_downloading_title) }
                     _download.update { state ->
                         if (state.downloadState is DownloadState.Downloading) {
                             state.copy(downloadState = DownloadState.Downloading(pct, eta, cleanLine))
@@ -370,7 +373,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 } catch (e: Exception) {
                     runCatching { downloadedFile.parentFile?.deleteRecursively() }
                     _download.update {
-                        it.copy(downloadState = DownloadState.Failed("保存到相册失败：${e.localizedMessage ?: "未知错误"}"))
+                        it.copy(
+                            downloadState = DownloadState.Failed(
+                                app.getString(R.string.conv_err_save, e.localizedMessage ?: "Unknown")
+                            )
+                        )
                     }
                 }
             }.onFailure { err ->
@@ -380,7 +387,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _download.update {
                         it.copy(
                             downloadState = DownloadState.Failed(
-                                "下载失败：${err.localizedMessage ?: "请检查网络，或尝试登录站点 Cookie / 更新 Nightly 核心"}"
+                                app.getString(R.string.dl_err_download, err.localizedMessage ?: "Unknown")
                             )
                         )
                     }
@@ -496,7 +503,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     trimEndMs = info.durationMs
                 )
             }.onFailure { err ->
-                _inspectError.value = err.localizedMessage ?: "无法解析所选视频文件"
+                _inspectError.value = err.localizedMessage ?: app.getString(R.string.inspect_error_default)
             }
             _isInspecting.value = false
         }

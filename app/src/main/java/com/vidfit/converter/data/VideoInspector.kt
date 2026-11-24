@@ -7,6 +7,7 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
+import com.vidfit.converter.R
 import com.vidfit.converter.model.VideoInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -120,7 +121,7 @@ class VideoInspector(private val context: Context) {
             }
 
             require(rawWidth > 0 && rawHeight > 0 && durationMs > 0L) {
-                "无法读取该视频的分辨率或时长，可能文件已损坏或格式不受系统解码器支持"
+                context.getString(R.string.inspect_error_corrupt)
             }
 
             VideoInfo(

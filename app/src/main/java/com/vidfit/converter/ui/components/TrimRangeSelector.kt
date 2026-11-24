@@ -11,7 +11,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.vidfit.converter.R
 import com.vidfit.converter.ui.theme.VidFitPalette
 
 @Composable
@@ -35,14 +37,23 @@ fun TrimRangeSelector(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "时长裁切：${formatDuration(safeStart)} - ${formatDuration(safeEnd)}（共 ${formatDuration(safeEnd - safeStart)}）",
+                text = stringResource(
+                    R.string.trim_label,
+                    formatDuration(safeStart),
+                    formatDuration(safeEnd),
+                    formatDuration(safeEnd - safeStart)
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
                 color = colors.primaryText
             )
             if (isTrimmed) {
                 TextButton(onClick = { onRangeChange(0L, safeDuration) }) {
-                    Text("重置", color = colors.accentText, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = stringResource(R.string.action_reset),
+                        color = colors.accentText,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
         }

@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import com.vidfit.converter.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -79,14 +80,14 @@ class MediaStoreSaver(private val context: Context) {
 
             val resolver = context.contentResolver
             val uri = resolver.insert(collection, values)
-                ?: error("无法在系统媒体库中创建输出文件")
+                ?: error(context.getString(R.string.saver_err_create))
 
             try {
                 resolver.openOutputStream(uri)?.use { out ->
                     tempFile.inputStream().use { input ->
                         input.copyTo(out, bufferSize = 64 * 1024)
                     }
-                } ?: error("无法打开输出流")
+                } ?: error(context.getString(R.string.saver_err_stream))
 
                 val doneValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.IS_PENDING, 0)

@@ -59,9 +59,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -69,7 +69,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidfit.converter.R
 import com.vidfit.converter.data.CookieSite
+import com.vidfit.converter.domain.EncodingNotice
 import com.vidfit.converter.domain.EncodingPlan
 import com.vidfit.converter.model.AppTab
 import com.vidfit.converter.model.AspectFitMode
@@ -102,7 +104,6 @@ import kotlin.math.roundToInt
 fun VidFitScreen(
     uiState: VidFitUiState,
     onSelectTab: (AppTab) -> Unit,
-    // Downloader callbacks
     onUrlChange: (String) -> Unit,
     onParseUrl: () -> Unit,
     onClearLink: () -> Unit,
@@ -123,7 +124,6 @@ fun VidFitScreen(
     onPlayDownloaded: (DownloadResult) -> Unit,
     onRemoveDownloadItem: (DownloadResult) -> Unit,
     onClearDownloadHistory: () -> Unit,
-    // Converter callbacks
     onPickFromGallery: () -> Unit,
     onPickFromFiles: () -> Unit,
     onSelectPreset: (ConversionPreset) -> Unit,
@@ -150,7 +150,6 @@ fun VidFitScreen(
     val colors = VidFitPalette.colors
     var activeSheet by remember { mutableStateOf<BentoSheetType?>(null) }
 
-    // Centered focus modal dialog for conversion progress & completion result
     ConversionFocusDialog(
         state = uiState.conversionState,
         onCancel = onCancelConversion,
@@ -249,7 +248,7 @@ fun VidFitScreen(
                                 CircularProgressIndicator(color = colors.actionButtonBg)
                                 Spacer(Modifier.height(14.dp))
                                 Text(
-                                    text = "正在体检视频编码与色彩...",
+                                    text = stringResource(R.string.inspecting_video),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = colors.primaryText,
                                     fontWeight = FontWeight.Medium
@@ -309,7 +308,7 @@ private fun BentoTopBar(
                 val isDarkSurface = colors.pageBackground.red < 0.2f
                 val owColor = if (isDarkSurface) Color(0xFF7DD3FC) else Color(0xFF0284C7)
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(13.dp),
                     color = colors.subtleSurface,
                     border = BorderStroke(1.dp, colors.cardBorder)
                 ) {
@@ -322,13 +321,15 @@ private fun BentoTopBar(
                                 append("ow")
                             }
                         },
-                        fontSize = 20.sp,
+                        fontSize = 23.sp,
                         letterSpacing = (-0.5).sp,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
                     )
                 }
                 Text(
-                    text = if (activeTab == AppTab.DOWNLOAD) "网络视频下载 · yt-dlp 核心" else "全平台兼容 · 上传体积精准控制",
+                    text = stringResource(
+                        if (activeTab == AppTab.DOWNLOAD) R.string.subtitle_download else R.string.subtitle_convert
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.secondaryText
                 )
@@ -352,7 +353,7 @@ private fun BentoTopBar(
                         )
                         Spacer(Modifier.width(4.dp))
                         Text(
-                            text = "换视频",
+                            text = stringResource(R.string.action_switch_video),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.accentText
@@ -362,7 +363,6 @@ private fun BentoTopBar(
             }
         }
 
-        // Sleek 2-tab Bento Segmented Switcher (Download | Convert)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -392,7 +392,7 @@ private fun BentoTopBar(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = tab.label,
+                            text = stringResource(tab.labelRes),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                             color = if (selected) colors.actionButtonText else colors.secondaryText
@@ -455,14 +455,14 @@ private fun BentoHomeScreen(
                     }
                     Column {
                         Text(
-                            text = "从相册选择",
+                            text = stringResource(R.string.pick_gallery_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = "MP4 · MOV · HDR",
+                            text = stringResource(R.string.pick_gallery_sub),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f)
                         )
@@ -500,14 +500,14 @@ private fun BentoHomeScreen(
                     }
                     Column {
                         Text(
-                            text = "从文件导入",
+                            text = stringResource(R.string.pick_files_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = colors.primaryText
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = "MKV · 下载目录视频",
+                            text = stringResource(R.string.pick_files_sub),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.secondaryText
                         )
@@ -542,32 +542,32 @@ private fun BentoHomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "专为兼容性与上传打造",
+                    text = stringResource(R.string.home_features_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = colors.primaryText
                 )
                 CapabilityRow(
                     icon = Icons.Rounded.HighQuality,
-                    title = "一键全平台兼容",
-                    subtitle = "自动转 H.264 + AAC，HDR 转 SDR 防发灰，竖屏旋转固化"
+                    title = stringResource(R.string.home_feat_compat_title),
+                    subtitle = stringResource(R.string.home_feat_compat_sub)
                 )
                 CapabilityRow(
                     icon = Icons.Rounded.Compress,
-                    title = "指定 MB 精准压大小",
-                    subtitle = "适配邮件 25MB / Discord 10MB 限制，低码率自动降分辨率防糊"
+                    title = stringResource(R.string.home_feat_size_title),
+                    subtitle = stringResource(R.string.home_feat_size_sub)
                 )
                 CapabilityRow(
                     icon = Icons.Rounded.Shield,
-                    title = "隐私保护与相册直存",
-                    subtitle = "上传前自动剥离 GPS 位置，硬件加速不发烫"
+                    title = stringResource(R.string.home_feat_privacy_title),
+                    subtitle = stringResource(R.string.home_feat_privacy_sub)
                 )
             }
         }
 
         if (recentResults.isNotEmpty()) {
             Text(
-                text = "最近转换",
+                text = stringResource(R.string.recent_conversions),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = colors.primaryText
@@ -609,10 +609,10 @@ private fun BentoHomeScreen(
                             )
                         }
                         IconButton(onClick = { onPlayResult(res) }) {
-                            Icon(Icons.Rounded.PlayArrow, contentDescription = "播放", tint = colors.primaryText)
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = stringResource(R.string.action_play), tint = colors.primaryText)
                         }
                         IconButton(onClick = { onShareResult(res) }) {
-                            Icon(Icons.Rounded.Share, contentDescription = "分享", tint = colors.accentText)
+                            Icon(Icons.Rounded.Share, contentDescription = stringResource(R.string.action_share), tint = colors.accentText)
                         }
                     }
                 }
@@ -679,7 +679,6 @@ private fun BentoEditorDashboard(
             .padding(horizontal = 16.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // 1. Compact Video Strip + Expandable ExoPlayer Preview
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = colors.cardBackground,
@@ -736,7 +735,7 @@ private fun BentoEditorDashboard(
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                text = if (showPreviewPlayer) "收起" else "预览",
+                                text = stringResource(if (showPreviewPlayer) R.string.action_collapse else R.string.action_preview),
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = colors.accentText
@@ -757,9 +756,9 @@ private fun BentoEditorDashboard(
             }
         }
 
-        // 2. High-Contrast Compatibility Status Banner
         val issues = info.compatibilityIssues
         if (issues.isNotEmpty()) {
+            val issueSummary = issues.take(2).map { stringResource(it.titleRes) }.joinToString(", ")
             Surface(
                 onClick = { onOpenSheet(BentoSheetType.DIAGNOSIS) },
                 shape = RoundedCornerShape(16.dp),
@@ -779,7 +778,7 @@ private fun BentoEditorDashboard(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "检测到 ${issues.size} 项兼容/上传问题（${issues.take(2).joinToString("、") { it.title }}）",
+                        text = stringResource(R.string.banner_issues_found, issues.size, issueSummary),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.warningText,
@@ -789,7 +788,7 @@ private fun BentoEditorDashboard(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "详情 ›",
+                        text = stringResource(R.string.action_details),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = colors.warningText
@@ -815,14 +814,14 @@ private fun BentoEditorDashboard(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = "原视频兼容性良好，可直接按需压缩上传体积",
+                        text = stringResource(R.string.banner_compat_good),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.successText,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        text = "参数 ›",
+                        text = stringResource(R.string.action_specs),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
                         color = colors.successText
@@ -831,7 +830,6 @@ private fun BentoEditorDashboard(
             }
         }
 
-        // 3. Quick One-Tap Presets Strip
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(end = 4.dp)
@@ -845,7 +843,7 @@ private fun BentoEditorDashboard(
                     border = if (selected) null else BorderStroke(1.dp, colors.cardBorder)
                 ) {
                     Text(
-                        text = preset.title,
+                        text = stringResource(preset.titleRes),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                         color = if (selected) colors.actionButtonText else colors.primaryText,
@@ -855,38 +853,44 @@ private fun BentoEditorDashboard(
             }
         }
 
-        // 4. Core 2x2 Bento Dashboard Grid
         val sizeHeadline = when (config.compressionMode) {
             CompressionMode.TARGET_SIZE -> "≤ ${config.targetSizeMb.roundToInt()} MB"
-            CompressionMode.QUALITY_LEVEL -> config.qualityTier.label
+            CompressionMode.QUALITY_LEVEL -> stringResource(config.qualityTier.labelRes)
         }
         val estReduction = if (info.fileSizeBytes > 0L) {
             (((info.fileSizeBytes - plan.estimatedOutputBytes).toDouble() / info.fileSizeBytes) * 100).roundToInt()
         } else 0
         val sizeSub = when {
-            plan.autoDownscaledNotice?.contains("不膨胀") == true ->
-                String.format(Locale.US, "预估 %.1f MB · 不膨胀", plan.estimatedSizeMb)
-            plan.autoDownscaledNotice != null -> "已自动降分辨率防糊"
-            estReduction > 5 -> String.format(Locale.US, "预估 %.1f MB (-%d%%)", plan.estimatedSizeMb, estReduction)
-            else -> String.format(Locale.US, "预估 %.1f MB", plan.estimatedSizeMb)
+            plan.notice is EncodingNotice.AlreadyUnderTarget ->
+                stringResource(R.string.tile_est_no_bloat, plan.estimatedSizeMb)
+            plan.notice is EncodingNotice.AutoDownscaled ->
+                stringResource(R.string.tile_auto_downscaled)
+            estReduction > 5 ->
+                stringResource(R.string.tile_est_reduced, plan.estimatedSizeMb, estReduction)
+            else ->
+                stringResource(R.string.tile_est_only, plan.estimatedSizeMb)
         }
 
         val resHeadline = "${minOf(plan.outputWidth, plan.outputHeight)}p · ${(plan.targetFps ?: info.frameRate).roundToInt()}fps"
         val resSub = if (config.aspectRatio == AspectRatioOption.ORIGINAL) {
-            "原比例 · 8px 对齐"
+            stringResource(R.string.tile_orig_aligned)
         } else {
-            "${config.aspectRatio.label} · ${config.aspectFitMode.label}"
+            "${stringResource(config.aspectRatio.labelRes)} · ${stringResource(config.aspectFitMode.labelRes)}"
         }
 
         val compatHeadline = "${if (config.videoCodec == OutputVideoCodec.H264) "H.264" else "H.265"} + AAC"
-        val compatSub = if (config.toneMapHdrToSdr) "HDR → SDR 防发灰已开" else "保留原始色彩空间"
+        val compatSub = stringResource(if (config.toneMapHdrToSdr) R.string.tile_hdr_to_sdr_on else R.string.tile_hdr_keep)
 
         val effDur = config.effectiveDurationMs(info.durationMs)
         val isTrimmed = effDur < info.durationMs - 500L
-        val trimHeadline = if (isTrimmed) "已裁 ${formatDuration(effDur)}" else "${formatDuration(info.durationMs)} 完整"
+        val trimHeadline = if (isTrimmed) {
+            stringResource(R.string.tile_trimmed_dur, formatDuration(effDur))
+        } else {
+            stringResource(R.string.tile_full_dur, formatDuration(info.durationMs))
+        }
         val trimSub = buildList {
-            if (config.stripLocationMetadata) add("去 GPS")
-            if (config.removeAudio) add("已静音") else add("保留声音")
+            if (config.stripLocationMetadata) add(stringResource(R.string.tile_strip_gps))
+            add(stringResource(if (config.removeAudio) R.string.tile_muted else R.string.tile_keep_audio))
         }.joinToString(" · ")
 
         Row(
@@ -896,7 +900,7 @@ private fun BentoEditorDashboard(
             BentoGridTile(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Rounded.Compress,
-                label = "上传体积 / 画质",
+                label = stringResource(R.string.tile_size_label),
                 headline = sizeHeadline,
                 headlineColor = colors.accentText,
                 subtitle = sizeSub,
@@ -906,7 +910,7 @@ private fun BentoEditorDashboard(
             BentoGridTile(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Rounded.AspectRatio,
-                label = "画面与帧率",
+                label = stringResource(R.string.tile_res_label),
                 headline = resHeadline,
                 headlineColor = colors.primaryText,
                 subtitle = resSub,
@@ -922,7 +926,7 @@ private fun BentoEditorDashboard(
             BentoGridTile(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Rounded.HighQuality,
-                label = "兼容性与色彩",
+                label = stringResource(R.string.tile_compat_label),
                 headline = compatHeadline,
                 headlineColor = colors.primaryText,
                 subtitle = compatSub,
@@ -932,7 +936,7 @@ private fun BentoEditorDashboard(
             BentoGridTile(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Rounded.ContentCut,
-                label = "剪辑与隐私",
+                label = stringResource(R.string.tile_trim_label),
                 headline = trimHeadline,
                 headlineColor = colors.primaryText,
                 subtitle = trimSub,
@@ -1050,7 +1054,7 @@ private fun BentoBottomActionDock(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "开始转换并存入相册",
+                        text = stringResource(R.string.cta_convert_save),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )

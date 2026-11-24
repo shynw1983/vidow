@@ -18,6 +18,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -28,9 +29,12 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vidfit.converter.R
+import com.vidfit.converter.domain.EncodingNotice
 import com.vidfit.converter.domain.EncodingPlan
 import com.vidfit.converter.model.AspectFitMode
 import com.vidfit.converter.model.AspectRatioOption
@@ -77,6 +81,12 @@ fun BentoSettingsBottomSheet(
 ) {
     val colors = VidFitPalette.colors
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = colors.actionButtonBg,
+        selectedLabelColor = colors.actionButtonText,
+        containerColor = colors.subtleSurface,
+        labelColor = colors.primaryText
+    )
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -95,19 +105,19 @@ fun BentoSettingsBottomSheet(
         ) {
             when (sheetType) {
                 BentoSheetType.DIAGNOSIS -> {
-                    SheetTitle("视频体检与兼容诊断")
+                    SheetTitle(stringResource(R.string.sheet_diagnosis_title))
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SpecChip("${info.displayWidth}×${info.displayHeight}")
                         SpecChip(info.shortCodecName)
-                        SpecChip(info.shortAudioCodecName)
+                        SpecChip(if (info.hasAudio) info.shortAudioCodecName else stringResource(R.string.audio_none))
                         SpecChip(String.format(Locale.US, "%.0f fps", info.frameRate))
                         SpecChip(info.colorTransferLabel)
                         SpecChip(formatFileSize(info.fileSizeBytes))
                         SpecChip(formatDuration(info.durationMs))
-                        if (info.hasLocationMetadata) SpecChip("含 GPS 坐标")
+                        if (info.hasLocationMetadata) SpecChip(stringResource(R.string.sheet_has_gps))
                     }
 
                     val issues = info.compatibilityIssues
@@ -119,14 +129,14 @@ fun BentoSettingsBottomSheet(
                                 .padding(14.dp)
                         ) {
                             Text(
-                                text = "兼容性良好",
+                                text = stringResource(R.string.sheet_compat_ok_title),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.successText
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                text = "该视频已是常见兼容格式，你可以直接按需要调整上传目标体积或比例。",
+                                text = stringResource(R.string.sheet_compat_ok_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.successText
                             )
@@ -141,14 +151,14 @@ fun BentoSettingsBottomSheet(
                                         .padding(14.dp)
                                 ) {
                                     Text(
-                                        text = issue.title,
+                                        text = stringResource(issue.titleRes),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = colors.warningText
                                     )
                                     Spacer(Modifier.height(3.dp))
                                     Text(
-                                        text = issue.detail,
+                                        text = stringResource(issue.detailRes),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = colors.warningText
                                     )
@@ -159,13 +169,14 @@ fun BentoSettingsBottomSheet(
                 }
 
                 BentoSheetType.SIZE -> {
-                    SheetTitle("上传体积与压缩模式")
+                    SheetTitle(stringResource(R.string.sheet_size_title))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         CompressionMode.entries.forEach { mode ->
                             FilterChip(
                                 selected = config.compressionMode == mode,
                                 onClick = { onUpdateCompressionMode(mode) },
-                                label = { Text(mode.label) }
+                                colors = chipColors,
+                                label = { Text(stringResource(mode.labelRes), fontWeight = FontWeight.SemiBold) }
                             )
                         }
                     }
@@ -177,12 +188,13 @@ fun BentoSettingsBottomSheet(
                                     FilterChip(
                                         selected = config.qualityTier == tier,
                                         onClick = { onUpdateQualityTier(tier) },
-                                        label = { Text(tier.label) }
+                                        colors = chipColors,
+                                        label = { Text(stringResource(tier.labelRes), fontWeight = FontWeight.SemiBold) }
                                     )
                                 }
                             }
                             Text(
-                                text = config.qualityTier.description,
+                                text = stringResource(config.qualityTier.descriptionRes),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.secondaryText
                             )
@@ -194,7 +206,11 @@ fun BentoSettingsBottomSheet(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.Bottom
                             ) {
-                                Text("目标体积上限", style = MaterialTheme.typography.bodyMedium, color = colors.secondaryText)
+                                Text(
+                                    text = stringResource(R.string.sheet_target_cap),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.secondaryText
+                                )
                                 Text(
                                     text = "${config.targetSizeMb.roundToInt()} MB",
                                     fontSize = 28.sp,
@@ -213,22 +229,23 @@ fun BentoSettingsBottomSheet(
                             ) {
                                 listOf(
                                     8f to "8 MB",
-                                    10f to "10 MB (Discord)",
-                                    25f to "25 MB (邮件)",
+                                    10f to stringResource(R.string.chip_10mb_discord),
+                                    25f to stringResource(R.string.chip_25mb_email),
                                     50f to "50 MB",
                                     100f to "100 MB"
                                 ).forEach { (mb, label) ->
                                     FilterChip(
                                         selected = config.targetSizeMb.roundToInt() == mb.roundToInt(),
                                         onClick = { onUpdateTargetSizeMb(mb) },
+                                        colors = chipColors,
                                         label = { Text(label) }
                                     )
                                 }
                             }
                             HorizontalDivider(color = colors.cardBorder)
                             SheetToggleRow(
-                                title = "码率偏低时自动降分辨率防模糊",
-                                subtitle = "防止极低码率硬压高分辨率导致严重马赛克",
+                                title = stringResource(R.string.toggle_auto_downscale_title),
+                                subtitle = stringResource(R.string.toggle_auto_downscale_sub),
                                 checked = config.autoDownscaleForTargetSize,
                                 onCheckedChange = onUpdateAutoDownscale
                             )
@@ -243,21 +260,28 @@ fun BentoSettingsBottomSheet(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "原体积 ${formatFileSize(info.fileSizeBytes)}",
+                            text = stringResource(R.string.sheet_orig_size, formatFileSize(info.fileSizeBytes)),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.secondaryText
                         )
                         Text(
-                            text = String.format(Locale.US, "预估输出 %.1f MB", plan.estimatedSizeMb),
+                            text = stringResource(R.string.sheet_est_output, plan.estimatedSizeMb),
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Bold,
                             color = colors.successAccent
                         )
                     }
 
-                    if (plan.autoDownscaledNotice != null) {
+                    val noticeText = when (val n = plan.notice) {
+                        is EncodingNotice.AlreadyUnderTarget ->
+                            stringResource(R.string.notice_already_under_target, n.targetMb)
+                        is EncodingNotice.AutoDownscaled ->
+                            stringResource(R.string.notice_auto_downscaled, n.newShortSide, n.targetMb)
+                        null -> null
+                    }
+                    if (noticeText != null) {
                         Text(
-                            text = plan.autoDownscaledNotice,
+                            text = noticeText,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium,
                             color = colors.accentText
@@ -266,55 +290,61 @@ fun BentoSettingsBottomSheet(
                 }
 
                 BentoSheetType.RESOLUTION -> {
-                    SheetTitle("画面分辨率、帧率与比例")
-                    SheetSectionLabel("最大分辨率（自动 8 像素对齐）")
+                    SheetTitle(stringResource(R.string.sheet_res_title))
+                    SheetSectionLabel(stringResource(R.string.sheet_max_res))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ResolutionCap.entries.forEach { cap ->
+                            val label = cap.fixedLabel ?: stringResource(cap.labelRes!!)
                             FilterChip(
                                 selected = config.resolutionCap == cap,
                                 onClick = { onUpdateResolution(cap) },
-                                label = { Text(cap.label) }
+                                colors = chipColors,
+                                label = { Text(label, fontWeight = FontWeight.SemiBold) }
                             )
                         }
                     }
 
-                    SheetSectionLabel("帧率上限")
+                    SheetSectionLabel(stringResource(R.string.sheet_max_fps))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FrameRateCap.entries.forEach { fps ->
+                            val label = fps.fixedLabel ?: stringResource(fps.labelRes!!)
                             FilterChip(
                                 selected = config.frameRateCap == fps,
                                 onClick = { onUpdateFps(fps) },
-                                label = { Text(fps.label) }
+                                colors = chipColors,
+                                label = { Text(label, fontWeight = FontWeight.SemiBold) }
                             )
                         }
                     }
 
-                    SheetSectionLabel("目标画面比例")
+                    SheetSectionLabel(stringResource(R.string.sheet_aspect_ratio))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AspectRatioOption.entries.forEach { ratio ->
                             FilterChip(
                                 selected = config.aspectRatio == ratio,
                                 onClick = { onUpdateAspectRatio(ratio) },
-                                label = { Text(ratio.label) }
+                                colors = chipColors,
+                                label = { Text(stringResource(ratio.labelRes), fontWeight = FontWeight.SemiBold) }
                             )
                         }
                     }
 
                     if (config.aspectRatio != AspectRatioOption.ORIGINAL) {
-                        SheetSectionLabel("画面填充方式")
+                        SheetSectionLabel(stringResource(R.string.sheet_fit_mode))
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             AspectFitMode.entries.forEach { mode ->
                                 FilterChip(
                                     selected = config.aspectFitMode == mode,
                                     onClick = { onUpdateAspectFitMode(mode) },
-                                    label = { Text(mode.label) }
+                                    colors = chipColors,
+                                    label = { Text(stringResource(mode.labelRes), fontWeight = FontWeight.SemiBold) }
                                 )
                             }
                         }
                     }
 
                     Text(
-                        text = "最终输出尺寸：${plan.outputWidth} × ${plan.outputHeight}" +
+                        text = stringResource(R.string.sheet_final_dims, plan.outputWidth, plan.outputHeight) +
                             (plan.targetFps?.let { " · ${it.toInt()} fps" } ?: ""),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
@@ -323,19 +353,20 @@ fun BentoSettingsBottomSheet(
                 }
 
                 BentoSheetType.COMPAT -> {
-                    SheetTitle("兼容性编码与色彩")
-                    SheetSectionLabel("输出视频编码")
+                    SheetTitle(stringResource(R.string.sheet_compat_title))
+                    SheetSectionLabel(stringResource(R.string.sheet_video_codec))
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutputVideoCodec.entries.forEach { codec ->
                             FilterChip(
                                 selected = config.videoCodec == codec,
                                 onClick = { onUpdateCodec(codec) },
-                                label = { Text(codec.label) }
+                                colors = chipColors,
+                                label = { Text(stringResource(codec.labelRes), fontWeight = FontWeight.SemiBold) }
                             )
                         }
                     }
                     Text(
-                        text = config.videoCodec.description,
+                        text = stringResource(config.videoCodec.descriptionRes),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.secondaryText
                     )
@@ -343,8 +374,8 @@ fun BentoSettingsBottomSheet(
                     HorizontalDivider(color = colors.cardBorder)
 
                     SheetToggleRow(
-                        title = "HDR 自动转 SDR (Rec.709)",
-                        subtitle = "避免 HDR 视频发到电脑、微信或网页后画面发灰、过曝",
+                        title = stringResource(R.string.toggle_hdr_sdr_title),
+                        subtitle = stringResource(R.string.toggle_hdr_sdr_sub),
                         checked = config.toneMapHdrToSdr,
                         onCheckedChange = onUpdateToneMapHdr
                     )
@@ -356,14 +387,14 @@ fun BentoSettingsBottomSheet(
                             .padding(12.dp)
                     ) {
                         Text(
-                            text = "已自动启用的底层兼容优化",
+                            text = stringResource(R.string.sheet_auto_compat_title),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.primaryText
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "• 统一 MP4 封装 + 通用 AAC 音频\n• 自动固化竖屏旋转元数据，防止老播放器横置",
+                            text = stringResource(R.string.sheet_auto_compat_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = colors.secondaryText
                         )
@@ -371,7 +402,7 @@ fun BentoSettingsBottomSheet(
                 }
 
                 BentoSheetType.TRIM_PRIVACY -> {
-                    SheetTitle("时长裁切与隐私")
+                    SheetTitle(stringResource(R.string.sheet_trim_title))
                     TrimRangeSelector(
                         durationMs = info.durationMs,
                         startMs = config.trimStartMs,
@@ -380,15 +411,15 @@ fun BentoSettingsBottomSheet(
                     )
                     HorizontalDivider(color = colors.cardBorder)
                     SheetToggleRow(
-                        title = "清除 GPS 地理位置元数据",
-                        subtitle = "上传前移除拍摄定位坐标，保护隐私",
+                        title = stringResource(R.string.toggle_strip_gps_title),
+                        subtitle = stringResource(R.string.toggle_strip_gps_sub),
                         checked = config.stripLocationMetadata,
                         onCheckedChange = onUpdateStripLocation
                     )
                     if (info.hasAudio) {
                         SheetToggleRow(
-                            title = "移除音轨（静音导出）",
-                            subtitle = "适合纯画面演示、动图场景，进一步省体积",
+                            title = stringResource(R.string.toggle_mute_title),
+                            subtitle = stringResource(R.string.toggle_mute_sub),
                             checked = config.removeAudio,
                             onCheckedChange = onUpdateRemoveAudio
                         )
@@ -408,7 +439,7 @@ fun BentoSettingsBottomSheet(
                     contentColor = colors.actionButtonText
                 )
             ) {
-                Text("完成", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.action_done), fontWeight = FontWeight.Bold)
             }
         }
     }

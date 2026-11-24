@@ -22,6 +22,7 @@ import androidx.media3.transformer.InAppMuxer
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.VideoEncoderSettings
+import com.vidfit.converter.R
 import com.vidfit.converter.domain.BitrateCalculator
 import com.vidfit.converter.domain.EncodingPlan
 import com.vidfit.converter.model.AspectFitMode
@@ -166,7 +167,12 @@ class VideoConverterEngine(private val context: Context) {
             } catch (e: Exception) {
                 stopProgressPolling()
                 activeTransformer = null
-                callbacks.onError("启动转码失败：${e.localizedMessage ?: e.javaClass.simpleName}")
+                callbacks.onError(
+                    context.getString(
+                        R.string.conv_err_start,
+                        e.localizedMessage ?: e.javaClass.simpleName
+                    )
+                )
             }
         }
 
@@ -209,14 +215,18 @@ class VideoConverterEngine(private val context: Context) {
         return when (e.errorCode) {
             ExportException.ERROR_CODE_DECODER_INIT_FAILED,
             ExportException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
-                "当前设备的系统解码器不支持该视频编码格式（建议后续版本启用 FFmpeg 软解兼容）"
+                context.getString(R.string.conv_err_decoder)
             ExportException.ERROR_CODE_ENCODER_INIT_FAILED,
             ExportException.ERROR_CODE_ENCODING_FORMAT_UNSUPPORTED ->
-                "设备硬件编码器初始化失败，请尝试切换为 H.264 或降低输出分辨率"
+                context.getString(R.string.conv_err_encoder)
             ExportException.ERROR_CODE_IO_FILE_NOT_FOUND,
             ExportException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE ->
-                "读取源视频失败，请确认文件未被移动或删除"
-            else -> "转码失败（代码 ${e.errorCode}）：${e.cause?.localizedMessage ?: e.localizedMessage ?: "未知错误"}"
+                context.getString(R.string.conv_err_io)
+            else -> context.getString(
+                R.string.conv_err_generic,
+                e.errorCode,
+                e.cause?.localizedMessage ?: e.localizedMessage ?: "Unknown"
+            )
         }
     }
 }

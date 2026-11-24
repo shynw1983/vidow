@@ -1,67 +1,68 @@
 package com.vidfit.converter.model
 
+import androidx.annotation.StringRes
+import com.vidfit.converter.R
+
 enum class OutputVideoCodec(
-    val label: String,
-    val description: String
+    @StringRes val labelRes: Int,
+    @StringRes val descriptionRes: Int
 ) {
-    H264("H.264 (AVC)", "全平台最强兼容，手机/电脑/网页通吃"),
-    H265("H.265 (HEVC)", "同等画质体积更小，适合新设备")
+    H264(R.string.codec_h264_label, R.string.codec_h264_desc),
+    H265(R.string.codec_h265_label, R.string.codec_h265_desc)
 }
 
 enum class ResolutionCap(
-    val label: String,
+    val fixedLabel: String?,
+    @StringRes val labelRes: Int?,
     val maxShortSide: Int?
 ) {
-    ORIGINAL("保持原分辨率", null),
-    P1080("1080p", 1080),
-    P720("720p", 720),
-    P480("480p", 480)
+    ORIGINAL(null, R.string.res_original, null),
+    P1080("1080p", null, 1080),
+    P720("720p", null, 720),
+    P480("480p", null, 480)
 }
 
 enum class FrameRateCap(
-    val label: String,
+    val fixedLabel: String?,
+    @StringRes val labelRes: Int?,
     val fps: Float?
 ) {
-    ORIGINAL("原帧率", null),
-    FPS_30("30 fps", 30f),
-    FPS_24("24 fps", 24f)
+    ORIGINAL(null, R.string.fps_original, null),
+    FPS_30("30 fps", null, 30f),
+    FPS_24("24 fps", null, 24f)
 }
 
 enum class AspectRatioOption(
-    val label: String,
+    @StringRes val labelRes: Int,
     val ratio: Float?
 ) {
-    ORIGINAL("原比例", null),
-    RATIO_16_9("16:9 横屏", 16f / 9f),
-    RATIO_9_16("9:16 竖屏", 9f / 16f),
-    RATIO_1_1("1:1 方形", 1f),
-    RATIO_4_5("4:5 社媒", 4f / 5f)
+    ORIGINAL(R.string.ratio_original, null),
+    RATIO_16_9(R.string.ratio_16_9, 16f / 9f),
+    RATIO_9_16(R.string.ratio_9_16, 9f / 16f),
+    RATIO_1_1(R.string.ratio_1_1, 1f),
+    RATIO_4_5(R.string.ratio_4_5, 4f / 5f)
 }
 
-enum class AspectFitMode(val label: String) {
-    CROP("裁剪填满"),
-    FIT("完整保留（留黑边）")
+enum class AspectFitMode(@StringRes val labelRes: Int) {
+    CROP(R.string.fit_crop),
+    FIT(R.string.fit_pad)
 }
 
-enum class CompressionMode(val label: String) {
-    QUALITY_LEVEL("画质档位"),
-    TARGET_SIZE("指定目标体积 (MB)")
+enum class CompressionMode(@StringRes val labelRes: Int) {
+    QUALITY_LEVEL(R.string.mode_quality),
+    TARGET_SIZE(R.string.mode_target_size)
 }
 
 enum class QualityTier(
-    val label: String,
-    val description: String,
-    /** Bits per pixel per frame factor used for estimating target bitrate. */
+    @StringRes val labelRes: Int,
+    @StringRes val descriptionRes: Int,
     val bitsPerPixelPerFrame: Double
 ) {
-    HIGH("高画质", "细节保留好，适合保存与分享", 0.14),
-    BALANCED("均衡", "画质与体积最佳平衡（推荐）", 0.095),
-    SMALL("高压缩", "明显减小体积，适合快速上传", 0.06)
+    HIGH(R.string.quality_high, R.string.quality_high_desc, 0.14),
+    BALANCED(R.string.quality_balanced, R.string.quality_balanced_desc, 0.095),
+    SMALL(R.string.quality_small, R.string.quality_small_desc, 0.06)
 }
 
-/**
- * User-selected conversion settings.
- */
 data class ConversionConfig(
     val presetId: String = ConversionPreset.UNIVERSAL_COMPAT.id,
     val videoCodec: OutputVideoCodec = OutputVideoCodec.H264,
@@ -72,13 +73,10 @@ data class ConversionConfig(
     val aspectFitMode: AspectFitMode = AspectFitMode.CROP,
     val compressionMode: CompressionMode = CompressionMode.QUALITY_LEVEL,
     val qualityTier: QualityTier = QualityTier.BALANCED,
-    /** Target file size in MB when compressionMode == TARGET_SIZE. */
     val targetSizeMb: Float = 25f,
-    /** Automatically step down resolution when target size makes bitrate too low. */
     val autoDownscaleForTargetSize: Boolean = true,
     val removeAudio: Boolean = false,
     val stripLocationMetadata: Boolean = true,
-    /** Optional clipping range in milliseconds. null means full video. */
     val trimStartMs: Long = 0L,
     val trimEndMs: Long? = null
 ) {

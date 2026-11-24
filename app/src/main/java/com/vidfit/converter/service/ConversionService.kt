@@ -63,7 +63,7 @@ class ConversionService : Service() {
                     stopSelf()
                     return START_NOT_STICKY
                 }
-                startForegroundWithNotification(0, "正在准备转码...")
+                startForegroundWithNotification(0, getString(R.string.conv_preparing))
                 runConversion(job.info, job.config)
             }
             else -> stopSelf()
@@ -78,10 +78,11 @@ class ConversionService : Service() {
         val tempFile = File(tempDir, "vidfit_${System.currentTimeMillis()}.mp4")
         currentTempFile = tempFile
 
+        val codecLabel = getString(config.videoCodec.labelRes)
         ConversionRepository.updateState(
             ConversionState.Converting(
                 progressPercent = 0,
-                statusText = "正在硬件转码 (${config.videoCodec.label})...",
+                statusText = getString(R.string.conv_running_codec, codecLabel),
                 elapsedMs = 0L
             )
         )
@@ -93,7 +94,7 @@ class ConversionService : Service() {
             callbacks = object : VideoConverterEngine.Callbacks {
                 override fun onProgress(percent: Int) {
                     val elapsed = SystemClock.elapsedRealtime() - startRealtimeMs
-                    val status = "正在转换 · $percent%"
+                    val status = getString(R.string.conv_progress_pct, percent)
                     ConversionRepository.updateState(
                         ConversionState.Converting(
                             progressPercent = percent,
@@ -107,11 +108,11 @@ class ConversionService : Service() {
                 override fun onCompleted(outputFile: File, plan: EncodingPlan) {
                     serviceScope.launch {
                         try {
-                            updateNotification(99, "正在保存到相册 (Movies/Vidow)...")
+                            updateNotification(99, getString(R.string.conv_saving_gallery))
                             ConversionRepository.updateState(
                                 ConversionState.Converting(
                                     progressPercent = 99,
-                                    statusText = "正在保存到相册...",
+                                    statusText = getString(R.string.conv_saving_short),
                                     elapsedMs = SystemClock.elapsedRealtime() - startRealtimeMs
                                 )
                             )
@@ -130,14 +131,16 @@ class ConversionService : Service() {
                                         outputWidth = plan.outputWidth,
                                         outputHeight = plan.outputHeight,
                                         elapsedMs = elapsed,
-                                        codecLabel = config.videoCodec.label,
+                                        codecLabel = codecLabel,
                                         convertedHdrToSdr = info.isHdr && config.toneMapHdrToSdr
                                     )
                                 )
                             )
                         } catch (e: Exception) {
                             ConversionRepository.updateState(
-                                ConversionState.Failed("保存到相册失败：${e.localizedMessage ?: "未知错误"}")
+                                ConversionState.Failed(
+                                    getString(R.string.conv_err_save, e.localizedMessage ?: "Unknown")
+                                )
                             )
                         } finally {
                             cleanupTempFile()
@@ -210,7 +213,7 @@ class ConversionService : Service() {
             .setOngoing(true)
             .setProgress(100, progress, progress == 0)
             .setContentIntent(openPending)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "取消", cancelPending)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, getString(R.string.action_cancel), cancelPending)
             .build()
     }
 

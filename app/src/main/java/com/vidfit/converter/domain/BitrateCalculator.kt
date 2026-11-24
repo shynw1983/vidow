@@ -9,8 +9,13 @@ import com.vidfit.converter.model.VideoInfo
 import kotlin.math.roundToInt
 
 /**
- * Resolved concrete encoding plan computed before launching Media3 Transformer.
+ * Structured, locale-independent notice produced by [BitrateCalculator].
  */
+sealed interface EncodingNotice {
+    data class AlreadyUnderTarget(val targetMb: Int) : EncodingNotice
+    data class AutoDownscaled(val targetMb: Int, val newShortSide: Int) : EncodingNotice
+}
+
 data class EncodingPlan(
     val outputWidth: Int,
     val outputHeight: Int,
@@ -18,18 +23,12 @@ data class EncodingPlan(
     val videoBitrateBps: Int,
     val estimatedAudioBitrateBps: Int,
     val estimatedOutputBytes: Long,
-    val autoDownscaledNotice: String? = null
+    val notice: EncodingNotice? = null
 ) {
     val estimatedSizeMb: Double
         get() = estimatedOutputBytes / (1024.0 * 1024.0)
 }
 
-/**
- * Pure Kotlin calculator for:
- * 1. 8-pixel aligned output dimensions (preserves exact 2160p/1080p/720p/480p while keeping OEM MediaCodec happy).
- * 2. Target file size (MB) -> video bitrate conversion with safety margin AND no-bloat cap for already-small videos.
- * 3. Smart auto-downscaling when target size would otherwise starve pixels into blocky video.
- */
 object BitrateCalculator {
 
     const val DEFAULT_AAC_BITRATE_BPS = 128_000
@@ -37,20 +36,12 @@ object BitrateCalculator {
     private const val MIN_VIDEO_BITRATE_BPS = 250_000
     private const val MAX_VIDEO_BITRATE_BPS = 35_000_000
 
-    /**
-     * Rounds a dimension to the nearest multiple of [alignment] (default 8).
-     * 2160, 1920, 1080, 1280, 720, 640, and 480 are all exact multiples of 8.
-     */
     fun alignDimension(value: Int, alignment: Int = 8): Int {
         val safeValue = value.coerceAtLeast(alignment)
         val rounded = ((safeValue + alignment / 2) / alignment) * alignment
         return rounded.coerceAtLeast(alignment)
     }
 
-    /**
-     * Computes target width and height given source display dimensions, resolution cap,
-     * and optional target aspect ratio.
-     */
     fun computeDimensions(
         sourceWidth: Int,
         sourceHeight: Int,
@@ -104,7 +95,6 @@ object BitrateCalculator {
             OutputVideoCodec.H265 -> 0.72
         }
 
-        // Source bitrate cap so we never needlessly bloat an already-compact video
         val sourceCap = if (info.videoBitrateBps > 0) {
             val isMoreEfficientSource = info.videoMimeType.contains("hevc", ignoreCase = true) ||
                 info.videoMimeType.contains("av01", ignoreCase = true) ||
@@ -119,7 +109,7 @@ object BitrateCalculator {
             MAX_VIDEO_BITRATE_BPS
         }
 
-        var downscaleNotice: String? = null
+        var notice: EncodingNotice? = null
         val videoBitrate: Int
 
         when (config.compressionMode) {
@@ -129,7 +119,6 @@ object BitrateCalculator {
                 val targetBudgetBps = (totalBps - audioBitrate).roundToInt()
                     .coerceIn(MIN_VIDEO_BITRATE_BPS, MAX_VIDEO_BITRATE_BPS)
 
-                // High-quality pixel ceiling so short clips don't get inflated up to the size cap
                 val highQualityCeiling = (
                     outW.toDouble() *
                         outH.toDouble() *
@@ -141,10 +130,9 @@ object BitrateCalculator {
                 val noBloatCap = minOf(sourceCap, highQualityCeiling)
                 if (targetBudgetBps > noBloatCap) {
                     videoBitrate = noBloatCap.coerceIn(MIN_VIDEO_BITRATE_BPS, MAX_VIDEO_BITRATE_BPS)
-                    downscaleNotice = "原视频已小于 ${config.targetSizeMb.roundToInt()}MB 上限，将保持画质不膨胀"
+                    notice = EncodingNotice.AlreadyUnderTarget(config.targetSizeMb.roundToInt())
                 } else {
                     videoBitrate = targetBudgetBps
-                    // Smart auto-downscale to preserve clarity when bitrate budget is tight
                     if (config.autoDownscaleForTargetSize) {
                         val currentShort = minOf(outW, outH)
                         val recommendedShort = when {
@@ -162,7 +150,10 @@ object BitrateCalculator {
                             )
                             outW = scaledW
                             outH = scaledH
-                            downscaleNotice = "为保证 ${config.targetSizeMb.roundToInt()}MB 下画面清晰，已自动优化为 ${recommendedShort}p"
+                            notice = EncodingNotice.AutoDownscaled(
+                                targetMb = config.targetSizeMb.roundToInt(),
+                                newShortSide = recommendedShort
+                            )
                         }
                         if (videoBitrate < 1_500_000 && effectiveFps > 31f) {
                             targetFps = 30f
@@ -187,7 +178,6 @@ object BitrateCalculator {
             }
         }
 
-        // Estimated output size includes ~3% MP4 container overhead
         val estimatedBytes = (((videoBitrate.toLong() + audioBitrate.toLong()) * durationSec / 8.0) * 1.03)
             .toLong()
             .coerceAtLeast(1024L)
@@ -199,7 +189,7 @@ object BitrateCalculator {
             videoBitrateBps = videoBitrate,
             estimatedAudioBitrateBps = audioBitrate,
             estimatedOutputBytes = estimatedBytes,
-            autoDownscaledNotice = downscaleNotice
+            notice = notice
         )
     }
 }
