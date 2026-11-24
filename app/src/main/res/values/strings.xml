@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Vidow</string>
+    <string name="channel_conversion_name">视频处理进度</string>
+    <string name="channel_conversion_desc">后台转换与压缩视频时显示实时进度</string>
+</resources>
