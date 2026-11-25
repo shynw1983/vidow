@@ -9,3 +9,5 @@
 .externalNativeBuild/
 .cxx/
 /release-portal/
+/macos-app/.build/
+/macos-app/dist/
